@@ -26,6 +26,12 @@ def _add_monitoring(groups: Groups) -> None:
         "--desktop", action="store_true", help="Show macOS notifications for alerts"
     )
     monitor.add_argument("--sound", action="store_true", help="Play a macOS sound for alerts")
+    monitor.add_argument(
+        "--auto-open",
+        action="store_true",
+        help="Open the official page for READY bookings when the session opens or a target "
+        "is restocked (it never fills or submits anything)",
+    )
     groups.add_parser("status", help="Refresh once and print the dashboard")
     sessions = _actions(groups, "sessions", "Session checks")
     sessions.add_parser("validate", help="Check the session page and live endpoint once")
@@ -73,10 +79,16 @@ def _add_bookings(groups: Groups) -> None:
     bookings.add_parser("prepare", help="Prepare a booking for a customer (interactive)")
     for action, text in (
         ("show", "Show a booking and its history"),
-        ("open", "Open the official PULN page for a READY booking"),
         ("confirm", "Mark CONFIRMED after verifying the confirmation email"),
     ):
         bookings.add_parser(action, help=text).add_argument("booking_id", type=int)
+    which = bookings.add_parser(
+        "open", help="Open the official PULN page for a READY booking"
+    ).add_mutually_exclusive_group(required=True)
+    which.add_argument("booking_id", type=int, nargs="?")
+    which.add_argument(
+        "--all-ready", action="store_true", help="One browser tab per READY booking of the session"
+    )
     review = bookings.add_parser(
         "review", help="Review a saved result page (.html) for a submitted booking"
     )

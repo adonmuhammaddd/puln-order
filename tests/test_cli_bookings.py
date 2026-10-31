@@ -32,11 +32,16 @@ def opened() -> list[str]:
 
 
 @pytest.fixture
-def run(opened: list[str]) -> Callable[..., int]:
-    def fake_open(url: str) -> bool:
+def fake_open(opened: list[str]) -> Callable[[str], bool]:
+    def record(url: str) -> bool:
         opened.append(url)
         return True
 
+    return record
+
+
+@pytest.fixture
+def run(fake_open: Callable[[str], bool]) -> Callable[..., int]:
     def runner(*argv: str) -> int:
         return main(list(argv), open_url=fake_open)
 
@@ -325,3 +330,124 @@ def test_open_warns_when_session_is_not_accepting(
 
     assert "not accepting orders" in capsys.readouterr().out
     assert opened == [PAGE_URL]
+
+
+def add_second_customer(feed: Feed) -> None:
+    feed("Second Customer", "081200000002", "second@example.test", "", "yes")
+    main(["customers", "add"])
+
+
+def test_open_all_ready_opens_a_tab_per_ready_booking(
+    feed: Feed, run: Callable[..., int], opened: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    add_second_customer(feed)
+    prepare(feed, run)
+    feed("2", "100", "1", "185", "", "READY")
+    run("bookings", "prepare")
+    capsys.readouterr()
+
+    assert run("bookings", "open", "--all-ready") == 0
+
+    out = capsys.readouterr().out
+    assert opened == [PAGE_URL, PAGE_URL]
+    assert "Synthetic Customer" in out
+    assert "Second Customer" in out
+    assert "second@example.test" not in out
+    assert "does not fill or submit" in out
+    run("bookings", "list")
+    assert capsys.readouterr().out.count("OFFICIAL_FLOW_OPENED") == 2
+
+
+def test_open_all_ready_without_ready_bookings(
+    feed: Feed, run: Callable[..., int], opened: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    prepare(feed, run, save="DRAFT")
+
+    assert run("bookings", "open", "--all-ready") == 1
+    assert opened == []
+    assert "No READY bookings" in capsys.readouterr().out
+
+
+def test_open_all_ready_reports_missing_browser(
+    feed: Feed, run: Callable[..., int], capsys: pytest.CaptureFixture[str]
+) -> None:
+    prepare(feed, run)
+    capsys.readouterr()
+
+    assert main(["bookings", "open", "--all-ready"], open_url=lambda url: False) == 1
+    assert PAGE_URL in capsys.readouterr().out
+    run("bookings", "list")
+    assert "READY" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("argv", [["bookings", "open"], ["bookings", "open", "1", "--all-ready"]])
+def test_open_needs_exactly_one_of_id_or_all_ready(argv: list[str]) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(argv)
+
+    assert exc_info.value.code == 2
+
+
+def stop_on_first_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    def interrupt(seconds: float) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("app.ui.commands.time.sleep", interrupt)
+
+
+def test_monitor_auto_open_opens_ready_bookings_when_session_opens(
+    feed: Feed,
+    run: Callable[..., int],
+    fake_open: Callable[[str], bool],
+    opened: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    prepare(feed, run)
+    before_opening = SAMPLE.replace(b'"accepting": true', b'"accepting": false')
+    main(
+        ["status"],
+        transport=httpx.MockTransport(
+            lambda r: httpx.Response(200, content=before_opening, headers=JSON)
+        ),
+    )
+    stop_on_first_sleep(monkeypatch)
+    capsys.readouterr()
+
+    exit_code = main(
+        ["monitor", "--no-bell", "--auto-open"],
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, content=SAMPLE, headers=JSON)),
+        open_url=fake_open,
+    )
+
+    assert exit_code == 0
+    assert opened == [PAGE_URL]
+    assert "Auto-open" in capsys.readouterr().out
+    run("bookings", "list")
+    assert "OFFICIAL_FLOW_OPENED" in capsys.readouterr().out
+
+
+def test_monitor_without_auto_open_never_opens_the_browser(
+    feed: Feed,
+    run: Callable[..., int],
+    fake_open: Callable[[str], bool],
+    opened: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    prepare(feed, run)
+    before_opening = SAMPLE.replace(b'"accepting": true', b'"accepting": false')
+    main(
+        ["status"],
+        transport=httpx.MockTransport(
+            lambda r: httpx.Response(200, content=before_opening, headers=JSON)
+        ),
+    )
+    stop_on_first_sleep(monkeypatch)
+
+    main(
+        ["monitor", "--no-bell"],
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, content=SAMPLE, headers=JSON)),
+        open_url=fake_open,
+    )
+
+    assert opened == []

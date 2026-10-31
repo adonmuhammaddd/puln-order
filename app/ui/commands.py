@@ -19,6 +19,8 @@ from app.clock import utc_now
 from app.config import Settings
 from app.database.engine import sqlite_file_path
 from app.repositories import booking_repository, customer_repository, product_repository
+from app.services.booking_service import BookingService
+from app.services.browser_service import AutoOpener, OpenOutcome
 from app.services.monitor_service import MonitorService, MonitorState, run_monitor
 from app.services.notification_service import Notifier
 from app.services.poll_policy import PollTiming
@@ -85,12 +87,15 @@ def _monitor_service(
     *,
     keep_running: bool,
     notifier: Notifier | None,
+    auto_opener: AutoOpener | None = None,
 ) -> MonitorService:
     settings = runtime.settings
 
     def on_event(event: ChangeEvent) -> None:
         if notifier is not None:
             notifier.notify(event)
+        if auto_opener is not None and (outcome := auto_opener.handle(event)) is not None:
+            _report_auto_open(runtime.console, outcome, session.page_url)
 
     return MonitorService(
         client=PulnClient(http),
@@ -108,6 +113,29 @@ def _monitor_service(
     )
 
 
+def _report_auto_open(console: Console, outcome: OpenOutcome, url: str) -> None:
+    if outcome.browser_failed:
+        console.print(
+            f"Auto-open: could not open a browser. Open this page yourself: {url}",
+            style="bold red",
+            markup=False,
+            soft_wrap=True,
+        )
+    elif outcome.booking_ids:
+        ids = ", ".join(map(str, outcome.booking_ids))
+        console.print(
+            f"Auto-open: official page opened for bookings {ids}. "
+            "Complete each form and security check yourself.",
+            style="bold yellow",
+            markup=False,
+        )
+    else:
+        console.print(
+            "Auto-open: official page opened (no READY bookings).",
+            style="bold yellow",
+        )
+
+
 def run_status(runtime: Runtime) -> int:
     """Manual refresh: exactly one request, then print the dashboard."""
     session = resolve_or_report(runtime)
@@ -123,7 +151,13 @@ def run_status(runtime: Runtime) -> int:
 
 
 def run_monitor_command(
-    runtime: Runtime, *, keep_running: bool, bell: bool, desktop: bool, sound: bool
+    runtime: Runtime,
+    *,
+    keep_running: bool,
+    bell: bool,
+    desktop: bool,
+    sound: bool,
+    auto_open: bool = False,
 ) -> int:
     session = resolve_or_report(runtime)
     if session is None:
@@ -136,9 +170,25 @@ def run_monitor_command(
         desktop=desktop or settings.notify_desktop,
         sound=sound or settings.notify_sound,
     )
+    auto_opener = (
+        AutoOpener(
+            BookingService(runtime.session_factory, session_slug=session.slug),
+            session.page_url,
+            runtime.open_url,
+            target_ids=frozenset(settings.target_product_ids),
+            clock=utc_now,
+        )
+        if auto_open
+        else None
+    )
     with runtime.http_client() as http:
         service = _monitor_service(
-            runtime, session, http, keep_running=keep_running, notifier=notifier
+            runtime,
+            session,
+            http,
+            keep_running=keep_running,
+            notifier=notifier,
+            auto_opener=auto_opener,
         )
         service.load_cached()
         ctx = _dashboard_context(runtime, service.target_ids)

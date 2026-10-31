@@ -18,6 +18,7 @@ from app.parsers.reservation_response_parser import (
 )
 from app.repositories import customer_repository, product_repository, snapshot_repository
 from app.services.booking_service import BookingError, BookingService, PreparationRequest
+from app.services.browser_service import open_ready_bookings
 from app.services.session_service import resolve_session
 from app.timefmt import format_local
 from app.ui.commands import Runtime, resolve_or_report
@@ -37,6 +38,7 @@ OFFICIAL_FLOW_NOTICE = (
     "Complete the order form and any security check yourself in the browser. "
     "This app does not fill or submit anything. Afterwards run: bookings mark {id} submitted"
 )
+NO_BROWSER = "Could not open a browser. Open this page yourself: {url}"
 
 
 def _whole_number(text: str) -> int:
@@ -230,6 +232,17 @@ def _page_url(runtime: Runtime, slug: str) -> str:
     return f"{runtime.settings.puln_base_url}/c/{slug}"
 
 
+def _warn_if_not_accepting(runtime: Runtime, slug: str) -> None:
+    with runtime.session_factory() as db:
+        cached = snapshot_repository.load_last_state(db, slug)
+    if cached is not None and not cached[0].accepting:
+        as_of = format_local(cached[1], runtime.settings.app_timezone)
+        runtime.console.print(
+            f"Warning: the session was not accepting orders at the last check ({as_of}).",
+            style="yellow",
+        )
+
+
 def run_open(runtime: Runtime, booking_id: int) -> int:
     def action(service: BookingService) -> int:
         booking = service.get(booking_id)
@@ -243,27 +256,41 @@ def run_open(runtime: Runtime, booking_id: int) -> int:
         for label, value in _describe(runtime, booking):
             console.print(f"{label}: {value}", markup=False, soft_wrap=True)
         console.print(f"Full contact details: customers show {booking.customer_id} --reveal")
-        with runtime.session_factory() as db:
-            cached = snapshot_repository.load_last_state(db, booking.session_slug)
-        if cached is not None and not cached[0].accepting:
-            as_of = format_local(cached[1], runtime.settings.app_timezone)
-            console.print(
-                f"Warning: the session was not accepting orders at the last check ({as_of}).",
-                style="yellow",
-            )
+        _warn_if_not_accepting(runtime, booking.session_slug)
         url = _page_url(runtime, booking.session_slug)
         if not runtime.open_url(url):
-            console.print(
-                f"Could not open a browser. Open this page yourself: {url}",
-                markup=False,
-                soft_wrap=True,
-            )
+            console.print(NO_BROWSER.format(url=url), markup=False, soft_wrap=True)
             return 1
         if booking.status is BookingStatus.READY:
             booking = service.transition(booking_id, BookingStatus.OFFICIAL_FLOW_OPENED)
         console.print(f"Opened {url}", markup=False, soft_wrap=True)
         console.print(OFFICIAL_FLOW_NOTICE.format(id=booking_id), style="yellow", markup=False)
         console.print(f"Booking {booking_id} is {booking.status}.")
+        return 0
+
+    return _guarded(runtime, action)
+
+
+def run_open_all_ready(runtime: Runtime) -> int:
+    def action(service: BookingService) -> int:
+        console, slug = runtime.console, service.session_slug
+        _warn_if_not_accepting(runtime, slug)
+        url = _page_url(runtime, slug)
+        outcome = open_ready_bookings(service, url, runtime.open_url)
+        for tab, booking_id in enumerate(outcome.booking_ids, start=1):
+            details = ", ".join(value for _, value in _describe(runtime, service.get(booking_id)))
+            console.print(
+                f"Tab {tab}: booking {booking_id}: {details}", markup=False, soft_wrap=True
+            )
+        if outcome.browser_failed:
+            console.print(NO_BROWSER.format(url=url), markup=False, soft_wrap=True)
+            return 1
+        if not outcome.booking_ids:
+            console.print(f"No READY bookings for {slug}; nothing was opened.", markup=False)
+            return 1
+        console.print(f"Opened {url} in {len(outcome.booking_ids)} tab(s).", markup=False)
+        console.print(OFFICIAL_FLOW_NOTICE.format(id="<id>"), style="yellow", markup=False)
+        console.print("Full contact details: customers show <customer id> --reveal")
         return 0
 
     return _guarded(runtime, action)

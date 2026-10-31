@@ -27,9 +27,9 @@ uv run python -m app.main db init
 
 ```bash
 uv run python -m app.main sessions validate   # does the session exist and is live.json valid?
-uv run python -m app.main monitor --desktop   # leave running in its own terminal tab
-uv run python -m app.main bookings prepare    # per customer, before or during the session
-uv run python -m app.main bookings open 1     # complete the official form yourself
+uv run python -m app.main bookings prepare    # per customer, before the session opens
+uv run python -m app.main monitor --desktop --auto-open   # own terminal tab; opens a tab per READY booking
+uv run python -m app.main bookings open --all-ready       # or open them yourself
 uv run python -m app.main bookings mark 1 submitted
 uv run python -m app.main bookings review 1 ~/Downloads/reservasi.html
 uv run python -m app.main bookings mark 1 awaiting-email
@@ -81,6 +81,7 @@ uv run python -m app.main bookings prepare            # interactive; shows last-
 uv run python -m app.main bookings list [--all]
 uv run python -m app.main bookings show 1             # details + status history
 uv run python -m app.main bookings open 1             # opens the official page in your browser
+uv run python -m app.main bookings open --all-ready   # one tab per READY booking, in ID order
 uv run python -m app.main bookings mark 1 submitted   # after completing the official form yourself
 uv run python -m app.main bookings mark 1 awaiting-email
 uv run python -m app.main bookings confirm 1          # only after checking the confirmation email
@@ -97,7 +98,8 @@ Open bookings can also become `FAILED` or `CANCELLED`; `CONFIRMED`, `FAILED` and
 are final. `READY` and `OFFICIAL_FLOW_OPENED` can step back for corrections.
 
 - `bookings open` only opens the official page. It never fills or submits the form, and any
-  security check is completed by a person in the browser.
+  security check is completed by a person in the browser. With `--all-ready` it opens one tab
+  per READY booking of the session and lists which tab belongs to which booking.
 - `CONFIRMED` is reachable only through `bookings confirm`, from `AWAITING_EMAIL`, after the
   operator states they checked the official confirmation email. HTTP 200 or a success page alone
   is not enough.
@@ -154,6 +156,11 @@ Precedence: `PULN_SESSION_URL` > `PULN_SESSION_SLUG` > `PULN_SESSION_DATE` (beco
 - HTTP 429 pauses for at least `Retry-After`.
 - HTTP 403, 404 and redirects stop monitoring; open the session in a browser instead.
 - Stops when the session stops accepting orders, unless `--keep-running` is given.
+- With `--auto-open`, when the session starts accepting orders or a target product goes from
+  sold out back to available, the official page opens in your browser: one tab per READY
+  booking (each moves to `OFFICIAL_FLOW_OPENED`), or a single tab when none are READY. At most
+  once a minute. The monitor must already be running before opening time and see the session
+  not yet accepting; it reacts to the change, not to a session that is already open.
 - Invalid data never replaces the last valid state; the dashboard marks it `LAST KNOWN`.
 - Stock and slot history is written only when a value changes.
 - The terminal bell rings for alerts: session opening/closing, target product stock changes,

@@ -49,6 +49,9 @@ The system `python3` on this Mac is 3.9.6. Always use `uv run` (pinned 3.12 via 
   (SUCCESS needs a success heading; unclear means NEEDS_REVIEW). Strips scripts/inputs; never
   extracts the customer name. Fixtures in `tests/fixtures/responses/` are synthetic; calibrate
   against a real saved page. `BookingService.record_page_review` never confirms.
+- `app/services/browser_service.py`: `open_ready_bookings` (one tab per READY booking, moves it
+  to OFFICIAL_FLOW_OPENED) and `AutoOpener` (`monitor --auto-open`: session accepting or a
+  target restocked from 0, 60 s cooldown). It only opens the page; nothing is filled or sent.
 - `app/services/notification_service.py`: `Notifier` (bell, macOS osascript banner with the
   message passed as argv, afplay sound); runner injected in tests.
 - `app/services/report_service.py` + `app/ui/report_commands.py`: `report`, `history`.

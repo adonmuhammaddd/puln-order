@@ -62,6 +62,8 @@ def _dispatch_bookings(args: argparse.Namespace, runtime: commands.Runtime) -> i
             return booking_commands.run_prepare(runtime)
         case "show":
             return booking_commands.run_show(runtime, args.booking_id)
+        case "open" if args.all_ready:
+            return booking_commands.run_open_all_ready(runtime)
         case "open":
             return booking_commands.run_open(runtime, args.booking_id)
         case "mark":
@@ -101,6 +103,7 @@ def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
                 bell=not args.no_bell,
                 desktop=args.desktop,
                 sound=args.sound,
+                auto_open=args.auto_open,
             )
         case "status":
             return commands.run_status(runtime)
