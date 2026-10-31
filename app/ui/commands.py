@@ -20,7 +20,7 @@ from app.config import Settings
 from app.database.engine import sqlite_file_path
 from app.repositories import booking_repository, customer_repository, product_repository
 from app.services.monitor_service import MonitorService, MonitorState, run_monitor
-from app.services.notification_service import TerminalNotifier
+from app.services.notification_service import Notifier
 from app.services.poll_policy import PollTiming
 from app.services.session_service import SessionConfigError, SessionRef, resolve_session
 from app.services.stock_monitor import ChangeEvent, describe_result
@@ -84,7 +84,7 @@ def _monitor_service(
     http: httpx.Client,
     *,
     keep_running: bool,
-    notifier: TerminalNotifier | None,
+    notifier: Notifier | None,
 ) -> MonitorService:
     settings = runtime.settings
 
@@ -122,12 +122,20 @@ def run_status(runtime: Runtime) -> int:
     return 0 if isinstance(service.state.last_result, LiveOk) else 1
 
 
-def run_monitor_command(runtime: Runtime, *, keep_running: bool, bell: bool) -> int:
+def run_monitor_command(
+    runtime: Runtime, *, keep_running: bool, bell: bool, desktop: bool, sound: bool
+) -> int:
     session = resolve_or_report(runtime)
     if session is None:
         return 2
     console = runtime.console
-    notifier = TerminalNotifier(console, bell=bell and runtime.settings.notify_bell)
+    settings = runtime.settings
+    notifier = Notifier(
+        console,
+        bell=bell and settings.notify_bell,
+        desktop=desktop or settings.notify_desktop,
+        sound=sound or settings.notify_sound,
+    )
     with runtime.http_client() as http:
         service = _monitor_service(
             runtime, session, http, keep_running=keep_running, notifier=notifier

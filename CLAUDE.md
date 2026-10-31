@@ -45,6 +45,14 @@ The system `python3` on this Mac is 3.9.6. Always use `uv run` (pinned 3.12 via 
   `BookingService.transition` refuses CONFIRMED, only `confirm(email_verified=True)` sets it.
   Every change writes a `BookingStatusChange` row. `bookings open` uses `Runtime.open_url`
   (tests inject a fake; `main(open_url=...)`).
+- `app/parsers/reservation_response_parser.py`: saved result page -> `ReservationReview`
+  (SUCCESS needs a success heading; unclear means NEEDS_REVIEW). Strips scripts/inputs; never
+  extracts the customer name. Fixtures in `tests/fixtures/responses/` are synthetic; calibrate
+  against a real saved page. `BookingService.record_page_review` never confirms.
+- `app/services/notification_service.py`: `Notifier` (bell, macOS osascript banner with the
+  message passed as argv, afplay sound); runner injected in tests.
+- `app/services/report_service.py` + `app/ui/report_commands.py`: `report`, `history`.
+- `app/ui/cli_parser.py`: argparse builders per command group; `app/main.py` dispatches.
 - `app/repositories/`: module functions taking a `Session`; they flush, callers commit.
 - `app/ui/dashboard.py`: pure render (`render_dashboard`), tested with `Console(record=True)`.
 - `app/ui/commands.py`: CLI handlers return exit codes; `app/main.py` builds the argparse CLI and

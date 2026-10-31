@@ -16,6 +16,7 @@ from app.database.tables import Booking, BookingStatusChange, Product
 from app.models.booking import BookingStatus, can_transition
 from app.models.customer import normalize_notes
 from app.models.puln import LiveStatus
+from app.parsers.reservation_response_parser import ReservationReview, ReviewOutcome
 from app.repositories import (
     booking_repository,
     customer_repository,
@@ -310,6 +311,28 @@ class BookingService:
             db.commit()
         logger.info("booking %d confirmed by operator", booking_id)
         return booking
+
+    def record_page_review(self, booking_id: int, review: ReservationReview) -> Booking:
+        """Record what the operator saw on a saved result page. Never confirms a booking."""
+        if review.outcome is ReviewOutcome.NEEDS_REVIEW:
+            raise BookingValidationError(
+                "the page needs manual review: " + "; ".join(review.reasons)
+            )
+        if review.outcome is ReviewOutcome.SUCCESS:
+            details = [
+                f"total {review.total}" if review.total else None,
+                f"reference {review.reference}" if review.reference else None,
+                f"pickup {review.pickup}" if review.pickup else None,
+            ]
+            note = "Success page reviewed: " + (
+                "; ".join(d for d in details if d) or "no details read"
+            )
+            target = BookingStatus.SUCCESS_PAGE_REVIEWED
+        else:
+            note = f"Failure page reviewed: {review.heading or review.title or 'no heading'}"
+            target = BookingStatus.FAILED
+        logger.info("booking %d: result page reviewed as %s", booking_id, review.outcome)
+        return self.transition(booking_id, target, note=note)
 
     # Queries
 

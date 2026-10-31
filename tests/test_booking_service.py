@@ -9,6 +9,10 @@ from app.database.engine import create_session_factory, init_db
 from app.models.booking import BookingStatus
 from app.models.customer import CustomerInput
 from app.models.puln import parse_live_status
+from app.parsers.reservation_response_parser import (
+    ReservationReview,
+    parse_reservation_response,
+)
 from app.repositories import product_repository, snapshot_repository
 from app.services.booking_service import (
     AVAILABILITY_WARNING,
@@ -338,3 +342,72 @@ def test_service_never_logs_notes_or_customer_data(
     assert "said hi" not in caplog.text
     assert "Synthetic" not in caplog.text
     assert f"booking {booking.id}" in caplog.text
+
+
+# Page review
+
+
+RESPONSES = Path(__file__).parent / "fixtures" / "responses"
+
+
+def review_of(name: str) -> ReservationReview:
+    return parse_reservation_response((RESPONSES / name).read_text())
+
+
+def submitted(service: BookingService, customer_id: int) -> int:
+    booking = service.prepare(request(customer_id), ready=True)
+    advance(service, booking.id, S.OFFICIAL_FLOW_OPENED, S.SUBMITTED_BY_USER)
+    return booking.id
+
+
+def test_success_review_moves_submitted_booking_forward(
+    service: BookingService, customer_id: int
+) -> None:
+    booking_id = submitted(service, customer_id)
+
+    booking = service.record_page_review(booking_id, review_of("success_with_reference.html"))
+
+    assert booking.status is S.SUCCESS_PAGE_REVIEWED
+    note = service.history(booking_id)[-1].note
+    assert note is not None
+    assert "Rp 105.000" in note
+    assert "PULN-7KQ2" in note
+
+
+def test_success_review_never_confirms(service: BookingService, customer_id: int) -> None:
+    booking_id = submitted(service, customer_id)
+
+    service.record_page_review(booking_id, review_of("success.html"))
+
+    assert service.get(booking_id).status is not S.CONFIRMED
+    assert service.get(booking_id).confirmed_at is None
+
+
+def test_success_review_requires_submitted_status(
+    service: BookingService, customer_id: int
+) -> None:
+    booking = service.prepare(request(customer_id), ready=True)
+
+    with pytest.raises(InvalidTransitionError, match="READY -> SUCCESS_PAGE_REVIEWED"):
+        service.record_page_review(booking.id, review_of("success.html"))
+
+
+def test_failure_review_marks_failed(service: BookingService, customer_id: int) -> None:
+    booking_id = submitted(service, customer_id)
+
+    booking = service.record_page_review(booking_id, review_of("failure.html"))
+
+    assert booking.status is S.FAILED
+    assert "Reservasi gagal" in (service.history(booking_id)[-1].note or "")
+
+
+@pytest.mark.parametrize("page", ["challenge.html", "title_only.html", "conflicting.html"])
+def test_ambiguous_review_changes_nothing(
+    service: BookingService, customer_id: int, page: str
+) -> None:
+    booking_id = submitted(service, customer_id)
+
+    with pytest.raises(BookingValidationError, match="manual review"):
+        service.record_page_review(booking_id, review_of(page))
+
+    assert service.get(booking_id).status is S.SUBMITTED_BY_USER

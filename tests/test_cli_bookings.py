@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from pathlib import Path
 
 import httpx
 import pytest
@@ -227,3 +228,83 @@ def test_dashboard_counts_prepared_bookings(
     main(["status"], transport=transport)
 
     assert "Prepared bookings: 1" in capsys.readouterr().out
+
+
+RESPONSES = Path(__file__).parent / "fixtures" / "responses"
+
+
+def to_submitted(feed: Feed, run: Callable[..., int]) -> None:
+    prepare(feed, run)
+    run("bookings", "open", "1")
+    run("bookings", "mark", "1", "submitted")
+
+
+def test_review_success_page_records_review_after_confirmation(
+    feed: Feed, run: Callable[..., int], capsys: pytest.CaptureFixture[str]
+) -> None:
+    to_submitted(feed, run)
+    capsys.readouterr()
+    feed("yes")
+
+    assert run("bookings", "review", "1", str(RESPONSES / "success.html")) == 0
+
+    out = capsys.readouterr().out
+    assert "Outcome: SUCCESS" in out
+    assert "Kataifi Rolls" in out
+    assert "Rp 45.000" in out
+    assert "not a confirmation" in out
+    assert "Booking 1 is SUCCESS_PAGE_REVIEWED" in out
+    assert "FAKE-TURNSTILE-TOKEN" not in out
+    assert "Contoh Pelanggan" not in out
+
+
+def test_review_warns_about_pickup_mismatch(
+    feed: Feed, run: Callable[..., int], capsys: pytest.CaptureFixture[str]
+) -> None:
+    to_submitted(feed, run)
+    capsys.readouterr()
+    feed("no")
+
+    run("bookings", "review", "1", str(RESPONSES / "success.html"))
+
+    out = capsys.readouterr().out
+    assert "pickup on the page differs" in out
+    assert "Booking 1 is SUBMITTED_BY_USER" not in out
+
+
+def test_review_without_operator_agreement_changes_nothing(
+    feed: Feed, run: Callable[..., int], capsys: pytest.CaptureFixture[str]
+) -> None:
+    to_submitted(feed, run)
+    feed("no")
+
+    assert run("bookings", "review", "1", str(RESPONSES / "success.html")) == 1
+    capsys.readouterr()
+    run("bookings", "show", "1")
+    assert "Status: SUBMITTED_BY_USER" in capsys.readouterr().out
+
+
+def test_review_ambiguous_page_asks_for_manual_review(
+    feed: Feed, run: Callable[..., int], capsys: pytest.CaptureFixture[str]
+) -> None:
+    to_submitted(feed, run)
+    capsys.readouterr()
+
+    assert run("bookings", "review", "1", str(RESPONSES / "challenge.html")) == 1
+    assert "manual review" in capsys.readouterr().out.lower()
+
+
+def test_review_failure_page_can_mark_failed(
+    feed: Feed, run: Callable[..., int], capsys: pytest.CaptureFixture[str]
+) -> None:
+    to_submitted(feed, run)
+    capsys.readouterr()
+    feed("yes")
+
+    assert run("bookings", "review", "1", str(RESPONSES / "failure.html")) == 0
+    assert "Booking 1 is FAILED" in capsys.readouterr().out
+
+
+def test_review_missing_file(run: Callable[..., int], capsys: pytest.CaptureFixture[str]) -> None:
+    assert run("bookings", "review", "1", "missing.html") == 2
+    assert "missing.html" in capsys.readouterr().err

@@ -12,91 +12,12 @@ from pydantic import ValidationError
 from rich.console import Console
 
 from app.config import Settings, load_settings
-from app.constants import APP_NAME, APP_VERSION
 from app.database.engine import create_session_factory, init_db, sqlite_file_path
 from app.logging_setup import configure_logging
-from app.ui import booking_commands, commands, customer_commands
+from app.ui import booking_commands, commands, customer_commands, report_commands
+from app.ui.cli_parser import build_parser
 
 logger = logging.getLogger(__name__)
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="python -m app.main",
-        description=f"{APP_NAME}: monitors PULN order availability. It never submits orders.",
-    )
-    parser.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
-    groups = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
-
-    monitor = groups.add_parser("monitor", help="Monitor the session live until it closes")
-    monitor.add_argument(
-        "--keep-running",
-        action="store_true",
-        help="Keep polling slowly after the session stops accepting orders",
-    )
-    monitor.add_argument("--no-bell", action="store_true", help="Do not ring the terminal bell")
-
-    groups.add_parser("status", help="Refresh once and print the dashboard")
-
-    sessions = groups.add_parser("sessions", help="Session checks")
-    session_actions = sessions.add_subparsers(dest="action", required=True, metavar="ACTION")
-    session_actions.add_parser("validate", help="Check the session page and live endpoint once")
-
-    products = groups.add_parser("products", help="Local product catalogue")
-    product_actions = products.add_subparsers(dest="action", required=True, metavar="ACTION")
-    product_actions.add_parser("list", help="List known products and targets")
-    name = product_actions.add_parser("name", help="Set the display name of a product ID")
-    name.add_argument("product_id", type=int)
-    name.add_argument("name")
-    limit = product_actions.add_parser(
-        "limit", help="Set the per-person limit seen on the official page (or none)"
-    )
-    limit.add_argument("product_id", type=int)
-    limit.add_argument("max_quantity", metavar="N|none")
-
-    bookings = groups.add_parser("bookings", help="Reservation preparation and tracking")
-    booking_actions = bookings.add_subparsers(dest="action", required=True, metavar="ACTION")
-    booking_list = booking_actions.add_parser("list", help="Bookings for the configured session")
-    booking_list.add_argument("--all", action="store_true", help="Include every session")
-    booking_actions.add_parser("prepare", help="Prepare a booking for a customer (interactive)")
-    for action, text in (
-        ("show", "Show a booking and its history"),
-        ("open", "Open the official PULN page for a READY booking"),
-        ("confirm", "Mark CONFIRMED after verifying the confirmation email"),
-    ):
-        booking_action = booking_actions.add_parser(action, help=text)
-        booking_action.add_argument("booking_id", type=int)
-    mark = booking_actions.add_parser("mark", help="Record a manual status change")
-    mark.add_argument("booking_id", type=int)
-    mark.add_argument("status", choices=sorted(booking_commands.MARK_TARGETS))
-    mark.add_argument("--note", action="store_true", help="Add a note (asked interactively)")
-
-    customers = groups.add_parser("customers", help="Customer profiles (max 10 active)")
-    customer_actions = customers.add_subparsers(dest="action", required=True, metavar="ACTION")
-    listing = customer_actions.add_parser("list", help="List customers with masked contacts")
-    listing.add_argument("--active", action="store_true", help="Only active customers")
-    customer_actions.add_parser("add", help="Add a consenting customer (interactive)")
-    show = customer_actions.add_parser("show", help="Show one customer")
-    show.add_argument("customer_id", type=int)
-    show.add_argument("--reveal", action="store_true", help="Show contact details unmasked")
-    edit = customer_actions.add_parser("edit", help="Edit a customer (interactive)")
-    edit.add_argument("customer_id", type=int)
-    for action, text in (("activate", "Reactivate"), ("deactivate", "Deactivate")):
-        toggle = customer_actions.add_parser(action, help=f"{text} a customer")
-        toggle.add_argument("customer_id", type=int)
-    delete = customer_actions.add_parser("delete", help="Delete or anonymize a customer")
-    delete.add_argument("customer_id", type=int)
-    delete.add_argument(
-        "--anonymize",
-        action="store_true",
-        help="Erase personal data but keep booking history",
-    )
-    delete.add_argument("--yes", action="store_true", help="Skip the typed confirmation")
-
-    db = groups.add_parser("db", help="Local database maintenance")
-    db_actions = db.add_subparsers(dest="action", required=True, metavar="ACTION")
-    db_actions.add_parser("init", help="Create the local SQLite database and tables")
-    return parser
 
 
 def _log_dir(settings: Settings) -> Path:
@@ -149,32 +70,49 @@ def _dispatch_bookings(args: argparse.Namespace, runtime: commands.Runtime) -> i
             )
         case "confirm":
             return booking_commands.run_confirm(runtime, args.booking_id)
+        case "review":
+            return booking_commands.run_review(runtime, args.booking_id, args.file)
     raise AssertionError(f"unhandled bookings action {args.action}")
 
 
-def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
-    match (args.command, getattr(args, "action", None)):
-        case ("monitor", None):
-            return commands.run_monitor_command(
-                runtime, keep_running=args.keep_running, bell=not args.no_bell
-            )
-        case ("status", None):
-            return commands.run_status(runtime)
-        case ("sessions", "validate"):
-            return commands.run_sessions_validate(runtime)
-        case ("products", "list"):
+def _dispatch_products(args: argparse.Namespace, runtime: commands.Runtime) -> int:
+    match args.action:
+        case "list":
             return commands.run_products_list(runtime)
-        case ("products", "name"):
+        case "name":
             return commands.run_products_name(runtime, args.product_id, args.name)
-        case ("products", "limit"):
+        case "limit":
             return commands.run_products_limit(runtime, args.product_id, args.max_quantity)
-        case ("bookings", _):
-            return _dispatch_bookings(args, runtime)
-        case ("customers", _):
+    raise AssertionError(f"unhandled products action {args.action}")
+
+
+def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
+    match args.command:
+        case "monitor":
+            return commands.run_monitor_command(
+                runtime,
+                keep_running=args.keep_running,
+                bell=not args.no_bell,
+                desktop=args.desktop,
+                sound=args.sound,
+            )
+        case "status":
+            return commands.run_status(runtime)
+        case "sessions":
+            return commands.run_sessions_validate(runtime)
+        case "products":
+            return _dispatch_products(args, runtime)
+        case "customers":
             return _dispatch_customers(args, runtime)
-        case ("db", "init"):
+        case "bookings":
+            return _dispatch_bookings(args, runtime)
+        case "report":
+            return report_commands.run_report(runtime)
+        case "history":
+            return report_commands.run_history(runtime, args.action, args.subject_id)
+        case "db":
             return commands.run_db_init(runtime)
-    raise AssertionError(f"unhandled command {args.command} {args.action}")
+    raise AssertionError(f"unhandled command {args.command}")
 
 
 def main(

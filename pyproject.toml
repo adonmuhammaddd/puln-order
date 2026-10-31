@@ -5,6 +5,7 @@ description = "Local monitoring and reservation-coordination assistant for PULN 
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "beautifulsoup4>=4.15.0",
     "httpx>=0.28.1",
     "pydantic>=2.14.2",
     "pydantic-settings>=2.16.2",

@@ -1,12 +1,21 @@
 """``bookings`` commands. The app prepares and tracks; the official PULN page does the rest."""
 
 from collections.abc import Callable
+from pathlib import Path
 
 from rich.table import Table
 
 from app.database.tables import Booking
-from app.models.booking import BookingStatus
+from app.models.booking import BookingStatus, can_transition
 from app.models.customer import mask_email, mask_phone, normalize_notes
+from app.parsers.reservation_response_parser import (
+    ReservationReview,
+    ResponseTooLargeError,
+    ReviewOutcome,
+    compare_with_booking,
+    parse_reservation_response,
+    read_response_file,
+)
 from app.repositories import customer_repository, product_repository, snapshot_repository
 from app.services.booking_service import BookingError, BookingService, PreparationRequest
 from app.services.session_service import resolve_session
@@ -277,6 +286,100 @@ def run_confirm(runtime: Runtime, booking_id: int) -> int:
         reference = ask(console, "Reference shown in the email (optional)")
         booking = service.confirm(booking_id, email_verified=True, reference=reference)
         console.print(f"Booking {booking_id} is {booking.status}.")
+        return 0
+
+    return _guarded(runtime, action)
+
+
+def _print_review(runtime: Runtime, review: ReservationReview) -> None:
+    console = runtime.console
+    style = {"SUCCESS": "bold green", "FAILURE": "bold red"}.get(review.outcome, "bold yellow")
+    console.print(f"Outcome: {review.outcome}", style=style)
+    for label, value in (
+        ("Title", review.title),
+        ("Heading", review.heading),
+        ("Total", review.total),
+        ("Pickup", review.pickup),
+        ("Location", review.location),
+        ("Visible reference", review.reference),
+    ):
+        console.print(f"{label}: {value or '-'}", markup=False, soft_wrap=True)
+    console.print("Line items:")
+    for item in review.line_items:
+        quantity = "?" if item.quantity is None else str(item.quantity)
+        console.print(f"  {item.name} x {quantity}  {item.amount or ''}".rstrip(), markup=False)
+    if not review.line_items:
+        console.print("  (none found)", style="dim")
+    if review.mentions_email_code:
+        console.print("The page says the reservation code is sent by email.")
+    for reason in review.reasons:
+        console.print(f"  ! {reason}", style="yellow", markup=False)
+
+
+def run_review(runtime: Runtime, booking_id: int, file: str) -> int:
+    def action(service: BookingService) -> int:
+        console = runtime.console
+        path = Path(file)
+        try:
+            review = parse_reservation_response(read_response_file(path))
+        except (OSError, ResponseTooLargeError) as error:
+            runtime.error_console.print(f"cannot read {file}: {error}", markup=False)
+            return 2
+        booking = service.get(booking_id)
+        _print_review(runtime, review)
+
+        with runtime.session_factory() as db:
+            product = product_repository.get_product(db, booking.puln_product_id)
+            slot = (
+                None
+                if booking.puln_slot_id is None
+                else snapshot_repository.get_pickup_slot(
+                    db, booking.session_slug, booking.puln_slot_id
+                )
+            )
+        warnings = []
+        if product is not None:
+            warnings += compare_with_booking(
+                review, product_name=product.name, quantity=booking.quantity
+            )
+        if slot is not None and review.pickup and review.pickup != slot.label:
+            warnings.append(
+                f"The pickup on the page differs from the booking's slot ({slot.label})."
+            )
+        for warning in warnings:
+            console.print(f"  ! {warning}", style="yellow", markup=False)
+        console.print(
+            "A success page is not a confirmation. The booking is confirmed only after the "
+            "official confirmation email is checked (bookings confirm).",
+            style="dim",
+        )
+
+        if review.outcome is ReviewOutcome.NEEDS_REVIEW:
+            console.print("This page needs manual review; the booking was not changed.")
+            return 1
+        target = (
+            BookingStatus.SUCCESS_PAGE_REVIEWED
+            if review.outcome is ReviewOutcome.SUCCESS
+            else BookingStatus.FAILED
+        )
+        if not can_transition(booking.status, target):
+            runtime.error_console.print(
+                f"booking {booking_id} is {booking.status}; it cannot move to {target}",
+                markup=False,
+            )
+            return 1
+        if (
+            ask(console, f"Record this review and move booking {booking_id} to {target}? Type yes")
+            .strip()
+            .lower()
+            != "yes"
+        ):
+            console.print("Not recorded; the booking stays as it is.")
+            return 1
+        booking = service.record_page_review(booking_id, review)
+        console.print(f"Booking {booking_id} is {booking.status}.")
+        if booking.status is BookingStatus.SUCCESS_PAGE_REVIEWED:
+            console.print(f"Next: bookings mark {booking_id} awaiting-email")
         return 0
 
     return _guarded(runtime, action)

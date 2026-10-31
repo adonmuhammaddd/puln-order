@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     max_customers: int = Field(default=10, ge=1, le=10)
 
     notify_bell: bool = True
+    notify_desktop: bool = False
+    notify_sound: bool = False
 
     @field_validator("puln_session_date", "puln_session_slug", "puln_session_url", mode="before")
     @classmethod

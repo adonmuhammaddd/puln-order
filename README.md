@@ -92,6 +92,41 @@ are final. `READY` and `OFFICIAL_FLOW_OPENED` can step back for corrections.
   last-known values and only produce warnings.
 - Every status change is kept in the booking history.
 
+### Reviewing a result page
+
+After submitting in the official page, save the result page from the browser (File > Save Page
+As, "Webpage, HTML only") and review it:
+
+```bash
+uv run python -m app.main bookings review 1 ~/Downloads/reservasi.html
+```
+
+- The outcome is `SUCCESS` only with a recognisable success heading ("Reservasi berhasil"),
+  `FAILURE` for a failure heading or title, and `NEEDS_REVIEW` for anything else (challenge
+  pages, the order form, conflicting signals). HTTP status is never used.
+- Line items, total, pickup, location and any visible reference are read best effort and
+  compared with the booking; differences are shown as warnings.
+- The file is read only. Scripts and form fields (which may contain tokens) are ignored, the
+  customer's name is not extracted, and nothing from the page is stored except a short note.
+- A reviewed success page moves the booking to `SUCCESS_PAGE_REVIEWED`, never `CONFIRMED`.
+- The parser was written from one observed page and synthetic fixtures; check it against a real
+  saved page before relying on the extracted details.
+
+### Notifications
+
+Alerts (session opening/closing, target stock changes, a slot reopening, endpoint down) ring
+the terminal bell. On macOS you can also enable a Notification Center banner and a sound:
+`NOTIFY_DESKTOP=true`, `NOTIFY_SOUND=true`, or `monitor --desktop --sound` for one run. If
+banners do not appear, allow notifications for Script Editor in System Settings.
+
+### Reports
+
+```bash
+uv run python -m app.main report            # checks, outcomes, target restocks, bookings
+uv run python -m app.main history stock 100 # recorded stock changes of a product
+uv run python -m app.main history slot 185  # recorded capacity changes of a slot
+```
+
 ### Session selection
 
 Precedence: `PULN_SESSION_URL` > `PULN_SESSION_SLUG` > `PULN_SESSION_DATE` (becomes
