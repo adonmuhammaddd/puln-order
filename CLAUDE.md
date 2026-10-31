@@ -36,6 +36,11 @@ The system `python3` on this Mac is 3.9.6. Always use `uv run` (pinned 3.12 via 
 - `app/services/poll_policy.py`: pure timing rules (`decide_next`). `stock_monitor.py`: pure
   diffing + `HealthTracker`/`DriftTracker` dedup. `monitor_service.py`: orchestration with
   injected clock/rng/sleep. `session_service.py`: URL resolution.
+- `app/models/customer.py`: normalise/validate name, WhatsApp (E.164), e-mail, notes; masking.
+  `app/services/customer_service.py`: limits, consent, duplicates, delete/anonymize; raises
+  `CustomerError` subclasses whose messages are safe to show. Never log personal data.
+- `app/ui/prompts.py` + `customer_commands.py`: personal data only via prompts (not flags).
+  CLI tests feed answers by monkeypatching `builtins.input`.
 - `app/repositories/`: module functions taking a `Session`; they flush, callers commit.
 - `app/ui/dashboard.py`: pure render (`render_dashboard`), tested with `Console(record=True)`.
 - `app/ui/commands.py`: CLI handlers return exit codes; `app/main.py` builds the argparse CLI and

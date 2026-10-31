@@ -24,3 +24,8 @@ def count_prepared(session: Session) -> int:
 def count_confirmed(session: Session) -> int:
     query = select(func.count()).where(Booking.status == BookingStatus.CONFIRMED)
     return session.scalar(query) or 0
+
+
+def customer_has_bookings(session: Session, customer_id: int) -> bool:
+    query = select(func.count()).where(Booking.customer_id == customer_id)
+    return (session.scalar(query) or 0) > 0

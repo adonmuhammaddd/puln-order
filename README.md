@@ -36,6 +36,29 @@ uv run python -m app.main products name 102 "Product name from the official page
 uv run python -m app.main db init
 ```
 
+### Customers
+
+```bash
+uv run python -m app.main customers add              # interactive, asks for explicit consent
+uv run python -m app.main customers list [--active]  # contact details masked
+uv run python -m app.main customers show 1 [--reveal]
+uv run python -m app.main customers edit 1           # Enter keeps a value, "-" clears notes
+uv run python -m app.main customers deactivate 1
+uv run python -m app.main customers activate 1
+uv run python -m app.main customers delete 1         # type DELETE to confirm
+uv run python -m app.main customers delete 1 --anonymize   # keep booking history
+```
+
+- Personal data is only entered through prompts, never as command-line flags, so it does not
+  land in shell history.
+- At most `MAX_CUSTOMERS` (up to 10) active profiles; inactive ones do not count.
+- WhatsApp numbers are stored as `+<country><number>`; `08...` becomes `+628...`.
+- A WhatsApp number or e-mail can belong to one profile only.
+- A customer with booking history cannot be deleted; `--anonymize` erases name, number, e-mail
+  and notes, deactivates the profile and keeps the bookings. Anonymized profiles cannot be
+  reactivated; add the customer again with fresh consent.
+- Logs refer to customers by ID only.
+
 ### Session selection
 
 Precedence: `PULN_SESSION_URL` > `PULN_SESSION_SLUG` > `PULN_SESSION_DATE` (becomes
