@@ -30,6 +30,11 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PL", "PT"]
 ignore = ["PLR2004"]
 
+[tool.ruff.lint.pylint]
+# Status-code dispatch and keyword-only dependency injection are clearer than splitting.
+max-args = 10
+max-returns = 10
+
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR0913"]
 

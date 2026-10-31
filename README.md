@@ -27,8 +27,36 @@ uv run python -m app.main db init
 
 ```bash
 uv run python -m app.main --help
+uv run python -m app.main sessions validate     # one check of the session page + live.json
+uv run python -m app.main status                # manual refresh: one request, print dashboard
+uv run python -m app.main monitor               # live dashboard until the session closes
+uv run python -m app.main monitor --keep-running --no-bell
+uv run python -m app.main products list
+uv run python -m app.main products name 102 "Product name from the official page"
 uv run python -m app.main db init
 ```
+
+### Session selection
+
+Precedence: `PULN_SESSION_URL` > `PULN_SESSION_SLUG` > `PULN_SESSION_DATE` (becomes
+`online-order-YYYYMMDD`). A generated slug is only a guess; run `sessions validate` first.
+
+### Monitoring behaviour
+
+- Polls every `PULN_POLL_INTERVAL_SECONDS` (minimum 5) with about 10% jitter.
+- Before `opens_at` it polls at the maximum interval and wakes up at opening time.
+- Network errors, 5xx and malformed data back off exponentially up to the maximum interval.
+- HTTP 429 pauses for at least `Retry-After`.
+- HTTP 403, 404 and redirects stop monitoring; open the session in a browser instead.
+- Stops when the session stops accepting orders, unless `--keep-running` is given.
+- Invalid data never replaces the last valid state; the dashboard marks it `LAST KNOWN`.
+- Stock and slot history is written only when a value changes.
+- The terminal bell rings for alerts: session opening/closing, target product stock changes,
+  a slot reopening, and the endpoint becoming unavailable. Disable with `--no-bell` or
+  `NOTIFY_BELL=false`.
+
+The live endpoint has no product names. Names come from the local catalogue (`products name`);
+unknown products show as `Product #<id>`.
 
 ## Development
 

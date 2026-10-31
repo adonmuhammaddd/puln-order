@@ -18,6 +18,7 @@ EXPECTED_TABLES = {
     "slot_snapshots",
     "bookings",
     "monitor_checks",
+    "live_states",
 }
 
 

@@ -6,12 +6,13 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+import httpx
 from pydantic import ValidationError
 from rich.console import Console
 
 from app.config import Settings, load_settings
 from app.constants import APP_NAME, APP_VERSION
-from app.database.engine import init_db, sqlite_file_path
+from app.database.engine import create_session_factory, init_db, sqlite_file_path
 from app.logging_setup import configure_logging
 from app.ui import commands
 
@@ -24,11 +25,32 @@ def build_parser() -> argparse.ArgumentParser:
         description=f"{APP_NAME}: monitors PULN order availability. It never submits orders.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {APP_VERSION}")
-    groups = parser.add_subparsers(dest="group", required=True, metavar="COMMAND")
+    groups = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
+
+    monitor = groups.add_parser("monitor", help="Monitor the session live until it closes")
+    monitor.add_argument(
+        "--keep-running",
+        action="store_true",
+        help="Keep polling slowly after the session stops accepting orders",
+    )
+    monitor.add_argument("--no-bell", action="store_true", help="Do not ring the terminal bell")
+
+    groups.add_parser("status", help="Refresh once and print the dashboard")
+
+    sessions = groups.add_parser("sessions", help="Session checks")
+    session_actions = sessions.add_subparsers(dest="action", required=True, metavar="ACTION")
+    session_actions.add_parser("validate", help="Check the session page and live endpoint once")
+
+    products = groups.add_parser("products", help="Local product catalogue")
+    product_actions = products.add_subparsers(dest="action", required=True, metavar="ACTION")
+    product_actions.add_parser("list", help="List known products and targets")
+    name = product_actions.add_parser("name", help="Set the display name of a product ID")
+    name.add_argument("product_id", type=int)
+    name.add_argument("name")
 
     db = groups.add_parser("db", help="Local database maintenance")
-    db_commands = db.add_subparsers(dest="command", required=True, metavar="ACTION")
-    db_commands.add_parser("init", help="Create the local SQLite database and tables")
+    db_actions = db.add_subparsers(dest="action", required=True, metavar="ACTION")
+    db_actions.add_parser("init", help="Create the local SQLite database and tables")
     return parser
 
 
@@ -45,7 +67,27 @@ def _format_config_error(error: ValidationError) -> str:
     return "\n".join(lines)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
+    match (args.command, getattr(args, "action", None)):
+        case ("monitor", None):
+            return commands.run_monitor_command(
+                runtime, keep_running=args.keep_running, bell=not args.no_bell
+            )
+        case ("status", None):
+            return commands.run_status(runtime)
+        case ("sessions", "validate"):
+            return commands.run_sessions_validate(runtime)
+        case ("products", "list"):
+            return commands.run_products_list(runtime)
+        case ("products", "name"):
+            return commands.run_products_name(runtime, args.product_id, args.name)
+        case ("db", "init"):
+            return commands.run_db_init(runtime)
+    raise AssertionError(f"unhandled command {args.command} {args.action}")
+
+
+def main(argv: Sequence[str] | None = None, *, transport: httpx.BaseTransport | None = None) -> int:
+    """Run the CLI. ``transport`` lets tests replace the network; production passes nothing."""
     args = build_parser().parse_args(argv)
     console = Console()
     error_console = Console(stderr=True)
@@ -58,9 +100,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     configure_logging(_log_dir(settings), settings.log_level)
     engine = init_db(settings.database_url)
-    logger.info("started command %s %s", args.group, args.command)
+    logger.info("started command %s %s", args.command, getattr(args, "action", ""))
+    runtime = commands.Runtime(
+        settings=settings,
+        engine=engine,
+        session_factory=create_session_factory(engine),
+        console=console,
+        error_console=error_console,
+        transport=transport,
+    )
     try:
-        return commands.run_db_init(settings, engine, console)
+        return _dispatch(args, runtime)
     finally:
         engine.dispose()
 

@@ -60,3 +60,6 @@ def configure_logging(log_dir: Path, level: str = "INFO") -> None:
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     root.addHandler(handler)
     root.setLevel(level)
+    # Our client logs each request with its outcome; skip the library's duplicate lines.
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)

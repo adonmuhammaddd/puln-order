@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     target_product_ids: Annotated[list[int], NoDecode] = Field(default_factory=lambda: [100])
     max_customers: int = Field(default=10, ge=1, le=10)
 
+    notify_bell: bool = True
+
     @field_validator("puln_session_date", "puln_session_slug", "puln_session_url", mode="before")
     @classmethod
     def _blank_to_none(cls, value: Any) -> Any:

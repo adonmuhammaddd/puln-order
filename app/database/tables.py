@@ -109,3 +109,15 @@ class MonitorCheck(Base):
     http_status: Mapped[int | None]
     outcome: Mapped[str] = mapped_column(String(40))
     detail: Mapped[str | None] = mapped_column(String(255))
+
+
+class LiveState(Base):
+    """The last valid live.json state per session, kept so a restart neither loses the
+    last-known data nor re-announces changes that were already shown."""
+
+    __tablename__ = "live_states"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_slug: Mapped[str] = mapped_column(String(80), unique=True)
+    payload: Mapped[str] = mapped_column(Text)
+    observed_at: Mapped[datetime]
