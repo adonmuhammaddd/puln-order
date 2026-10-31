@@ -67,6 +67,17 @@ class CustomerService:
             field = "whatsapp" if whatsapp and other.whatsapp == whatsapp else "email"
             raise DuplicateCustomerError(f"customer {other.id} already uses this {field}")
 
+    def ensure_capacity(self) -> None:
+        """Fail early, before the operator types any personal data."""
+        with self._session_factory() as session:
+            self._check_capacity(session)
+
+    def ensure_unique(
+        self, *, whatsapp: str | None, email: str | None, exclude_id: int | None = None
+    ) -> None:
+        with self._session_factory() as session:
+            self._check_duplicates(session, whatsapp=whatsapp, email=email, exclude_id=exclude_id)
+
     def create(self, data: CustomerInput, *, consent_confirmed: bool) -> Customer:
         if not consent_confirmed:
             raise ConsentRequiredError("the customer's consent must be confirmed before saving")

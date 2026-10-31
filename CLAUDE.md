@@ -53,6 +53,9 @@ The system `python3` on this Mac is 3.9.6. Always use `uv run` (pinned 3.12 via 
   message passed as argv, afplay sound); runner injected in tests.
 - `app/services/report_service.py` + `app/ui/report_commands.py`: `report`, `history`.
 - `app/ui/cli_parser.py`: argparse builders per command group; `app/main.py` dispatches.
+- `app/services/export_service.py`: CSV exports (no contacts/notes, formula-safe cells) and
+  `backup_database` (sqlite3 backup API); all files chmod 600.
+- `app/timefmt.py`: display-time helpers shared by UI and exports.
 - `app/repositories/`: module functions taking a `Session`; they flush, callers commit.
 - `app/ui/dashboard.py`: pure render (`render_dashboard`), tested with `Console(record=True)`.
 - `app/ui/commands.py`: CLI handlers return exit codes; `app/main.py` builds the argparse CLI and

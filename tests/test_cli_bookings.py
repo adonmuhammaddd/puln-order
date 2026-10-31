@@ -308,3 +308,20 @@ def test_review_failure_page_can_mark_failed(
 def test_review_missing_file(run: Callable[..., int], capsys: pytest.CaptureFixture[str]) -> None:
     assert run("bookings", "review", "1", "missing.html") == 2
     assert "missing.html" in capsys.readouterr().err
+
+
+def test_open_warns_when_session_is_not_accepting(
+    feed: Feed, run: Callable[..., int], opened: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    prepare(feed, run)
+    closed = SAMPLE.replace(b'"accepting": true', b'"accepting": false')
+    main(
+        ["status"],
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, content=closed, headers=JSON)),
+    )
+    capsys.readouterr()
+
+    assert run("bookings", "open", "1") == 0
+
+    assert "not accepting orders" in capsys.readouterr().out
+    assert opened == [PAGE_URL]

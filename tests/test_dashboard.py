@@ -17,6 +17,7 @@ SESSION = SessionRef(
 )
 STATUS = parse_live_status((Path(__file__).parent / "fixtures" / "live_sample.json").read_bytes())
 CHECKED = datetime(2026, 10, 30, 23, 7, tzinfo=UTC)
+OPENS = datetime(2026, 10, 30, 23, 0, tzinfo=UTC)
 CONTEXT = DashboardContext(
     timezone="Asia/Jakarta",
     target_ids=frozenset({100}),
@@ -65,7 +66,7 @@ def test_header_shows_session_and_local_times() -> None:
 def test_products_show_names_stock_and_target_marker() -> None:
     text = render(live_state())
 
-    kataifi = next(line for line in text.splitlines() if "Kataifi Rolls" in line)
+    kataifi = next(line for line in text.splitlines() if "Kataifi Rolls" in line and "│" in line)
     assert "100" in kataifi
     assert "60" in kataifi
     assert "*" in kataifi
@@ -169,3 +170,48 @@ def test_failed_check_on_cached_data_reports_unavailability() -> None:
 
     assert freshness(state, CONTEXT, CHECKED) is Freshness.LAST_KNOWN
     assert "current data unavailable" in render(state)
+
+
+def test_target_summary_shows_sold_out() -> None:
+    text = render(live_state())
+
+    first_lines = "\n".join(text.splitlines()[:4])
+    assert "Kataifi Rolls: SOLD OUT" in first_lines
+
+
+def test_target_summary_shows_available_stock() -> None:
+    restocked = STATUS.model_copy(
+        update={
+            "products": [
+                p.model_copy(update={"stock_remaining": 3}) if p.id == 100 else p
+                for p in STATUS.products
+            ]
+        }
+    )
+
+    text = render(live_state(last_valid=restocked))
+
+    assert "Kataifi Rolls: AVAILABLE 3" in text
+
+
+def test_target_summary_flags_missing_target() -> None:
+    without = STATUS.model_copy(update={"products": [p for p in STATUS.products if p.id != 100]})
+
+    assert "Kataifi Rolls: NOT IN LIVE DATA" in render(live_state(last_valid=without))
+
+
+def test_next_check_shows_countdown() -> None:
+    text = render(live_state(), now=CHECKED + timedelta(seconds=3))
+
+    assert "(in 7s)" in text
+
+
+def test_pre_open_session_shows_time_until_opening() -> None:
+    pre_open = STATUS.model_copy(
+        update={"accepting": False, "server_now": OPENS - timedelta(minutes=12)}
+    )
+    now = OPENS - timedelta(minutes=12, seconds=30)
+
+    text = render(live_state(last_valid=pre_open, last_valid_at=now), now=now)
+
+    assert "Opens in 12m 30s" in text

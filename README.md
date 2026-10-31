@@ -23,6 +23,20 @@ cp .env.example .env   # then set PULN_SESSION_DATE to the real session date
 uv run python -m app.main db init
 ```
 
+## A session day in short
+
+```bash
+uv run python -m app.main sessions validate   # does the session exist and is live.json valid?
+uv run python -m app.main monitor --desktop   # leave running in its own terminal tab
+uv run python -m app.main bookings prepare    # per customer, before or during the session
+uv run python -m app.main bookings open 1     # complete the official form yourself
+uv run python -m app.main bookings mark 1 submitted
+uv run python -m app.main bookings review 1 ~/Downloads/reservasi.html
+uv run python -m app.main bookings mark 1 awaiting-email
+uv run python -m app.main bookings confirm 1  # after the confirmation email arrives
+uv run python -m app.main report
+```
+
 ## Usage
 
 ```bash
@@ -149,6 +163,62 @@ Precedence: `PULN_SESSION_URL` > `PULN_SESSION_SLUG` > `PULN_SESSION_DATE` (beco
 The live endpoint has no product names. Names come from the local catalogue (`products name`);
 unknown products show as `Product #<id>`.
 
+### Exports
+
+```bash
+uv run python -m app.main export bookings [--all] [--with-names]
+uv run python -m app.main export stock
+uv run python -m app.main export slots
+```
+
+Files go to `data/exports/` with owner-only permissions. Booking exports never contain WhatsApp
+numbers, e-mail addresses or notes; names appear only with `--with-names`. Cells starting with
+`=`, `+`, `-` or `@` are prefixed with `'` so spreadsheets do not run them as formulas.
+
+## Backup and restore
+
+```bash
+uv run python -m app.main db backup
+```
+
+This writes `data/backups/puln_assistant-YYYYMMDD-HHMMSS.db` using SQLite's online backup API,
+so it is safe while `monitor` is running. The backup contains customer data: keep it on
+encrypted storage you control (FileVault is enough for the local disk) and never in a shared
+or synced folder you do not trust.
+
+To restore, stop every running command, keep a copy of the current file, then copy the backup
+over it:
+
+```bash
+cp data/puln_assistant.db data/puln_assistant.db.before-restore
+cp data/backups/puln_assistant-20261031-133015.db data/puln_assistant.db
+chmod 600 data/puln_assistant.db
+rm -f data/puln_assistant.db-wal data/puln_assistant.db-shm
+uv run python -m app.main db init   # verifies the file opens and adds any newer tables
+```
+
+## Troubleshooting
+
+| Symptom | What it means | What to do |
+|---|---|---|
+| `python3 --version` shows 3.9 | macOS system Python | Use `uv run ...`; uv uses the pinned 3.12 |
+| `Invalid configuration: PULN_...` | A value in `.env` failed validation | Fix the named variable; intervals below 5 s are refused |
+| `No session configured` | No date, slug or URL set | Set `PULN_SESSION_DATE` (or slug/URL) in `.env` |
+| `session not found (HTTP 404)` | The generated slug has no session | Check the date, or copy the real URL into `PULN_SESSION_URL` |
+| `access challenged (HTTP 403)` | The site asked for a browser check | Open the session in a browser; the app will not retry or bypass it |
+| `unexpected HTTP 302` | Redirect, possibly a queue or moved page | Open the session page in a browser and follow the official flow |
+| `rate limited (HTTP 429)` | The site asked us to slow down | Nothing; the monitor waits for `Retry-After`. Consider a larger interval |
+| Dashboard shows `LAST KNOWN` | The latest request failed | Data shown is the last valid state; see `Last response` for the reason |
+| Dashboard shows `STALE` | No fresh data for 3 intervals | Usually backoff or a slow network; availability may have changed |
+| `Live data has new fields` | PULN changed the live.json format | Monitoring continues; report the field names so the model can be updated |
+| `database is locked` / database error alert | Another process holds the SQLite file | Monitoring continues without history; close other commands using the database |
+| `bookings review` says `NEEDS_REVIEW` | The saved page is not a clear result page | Check the page yourself; save the final result page, not the form or a challenge |
+| No macOS banner | Notifications blocked for Script Editor | System Settings > Notifications > Script Editor > allow |
+| `customers add` says the limit is reached | Already `MAX_CUSTOMERS` active profiles | Deactivate a customer who is no longer coordinated |
+
+Logs with request outcomes and timings (no personal data) are in
+`data/logs/puln_assistant.log`.
+
 ## Development
 
 ```bash
@@ -163,5 +233,6 @@ Everything stays on this machine under `data/` (git-ignored):
 
 - `data/puln_assistant.db`: SQLite database, permissions restricted to the current user
 - `data/logs/puln_assistant.log`: rotating log; e-mail addresses, phone numbers and tokens are redacted
+- `data/exports/`, `data/backups/`: CSV exports and database backups, owner-only
 
 Never commit `.env`, the database, logs, or real customer data.

@@ -210,3 +210,32 @@ def test_dashboard_counts_active_customers(
     assert "Active profiles: 1 / 10" in out
     assert "Synthetic Customer" not in out
     assert "example.test" not in out
+
+
+def test_add_reports_duplicate_before_asking_for_consent(
+    feed: Feed, capsys: pytest.CaptureFixture[str]
+) -> None:
+    add(feed, 1)
+    capsys.readouterr()
+    feed("Synthetic Customer 2", "0812-0000-0001")
+
+    assert main(["customers", "add"]) == 1
+
+    captured = capsys.readouterr()
+    assert "already uses this whatsapp" in captured.err
+    assert "Type yes" not in captured.out
+
+
+def test_add_reports_full_capacity_before_any_prompt(
+    feed: Feed, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("MAX_CUSTOMERS", "1")
+    add(feed, 1)
+    capsys.readouterr()
+    feed()
+
+    assert main(["customers", "add"]) == 1
+
+    captured = capsys.readouterr()
+    assert "already 1 active customers" in captured.err
+    assert "Display name" not in captured.out

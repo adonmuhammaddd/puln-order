@@ -48,3 +48,19 @@ def slot_history(session: Session, slug: str, slot_id: int) -> Sequence[SlotSnap
         .where(SlotSnapshot.session_slug == slug, SlotSnapshot.puln_slot_id == slot_id)
         .order_by(SlotSnapshot.observed_at, SlotSnapshot.id)
     ).all()
+
+
+def session_stock_snapshots(session: Session, slug: str) -> Sequence[StockSnapshot]:
+    return session.scalars(
+        select(StockSnapshot)
+        .where(StockSnapshot.session_slug == slug)
+        .order_by(StockSnapshot.observed_at, StockSnapshot.id)
+    ).all()
+
+
+def session_slot_snapshots(session: Session, slug: str) -> Sequence[SlotSnapshot]:
+    return session.scalars(
+        select(SlotSnapshot)
+        .where(SlotSnapshot.session_slug == slug)
+        .order_by(SlotSnapshot.observed_at, SlotSnapshot.id)
+    ).all()

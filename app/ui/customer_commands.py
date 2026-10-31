@@ -18,9 +18,9 @@ from app.models.customer import (
     normalize_whatsapp,
 )
 from app.services.customer_service import CustomerError, CustomerService
+from app.timefmt import format_local
 from app.ui.commands import Runtime
 from app.ui.prompts import PromptCancelled, TooManyAttempts, ask, ask_valid, confirm_word
-from app.ui.timefmt import format_local
 
 CONSENT_QUESTION = (
     "Has this customer agreed that their name, WhatsApp number and email are stored on this "
@@ -84,10 +84,12 @@ def run_list(runtime: Runtime, *, active_only: bool) -> int:
     return 0
 
 
-def _prompt_new(console: Console) -> CustomerInput:
+def _prompt_new(console: Console, service: CustomerService) -> CustomerInput:
     name = ask_valid(console, "Display name", normalize_name)
     whatsapp = ask_valid(console, "WhatsApp number", normalize_whatsapp)
+    service.ensure_unique(whatsapp=whatsapp, email=None)
     email = ask_valid(console, "Email", normalize_email)
+    service.ensure_unique(whatsapp=None, email=email)
     notes = ask_valid(console, "Notes (optional)", normalize_notes)
     return CustomerInput.model_validate(
         {"display_name": name, "whatsapp": whatsapp, "email": email, "notes": notes}
@@ -97,12 +99,14 @@ def _prompt_new(console: Console) -> CustomerInput:
 def run_add(runtime: Runtime) -> int:
     def action() -> int:
         console = runtime.console
+        service = _service(runtime)
+        service.ensure_capacity()
         console.print("New customer. Use only details the customer agreed to share.")
-        data = _prompt_new(console)
+        data = _prompt_new(console, service)
         if ask(console, CONSENT_QUESTION).strip().lower() != "yes":
             console.print("Consent not confirmed; nothing was saved.")
             return 1
-        customer = _service(runtime).create(data, consent_confirmed=True)
+        customer = service.create(data, consent_confirmed=True)
         console.print(f"Added customer {customer.id}.")
         return 0
 

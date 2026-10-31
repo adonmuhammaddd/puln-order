@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from app.models.puln import LivePayloadError, LiveStatus, parse_live_status, unknown_fields
-from app.ui.timefmt import format_local, to_local
+from app.timefmt import format_local, to_local
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

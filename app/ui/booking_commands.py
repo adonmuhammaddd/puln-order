@@ -19,9 +19,9 @@ from app.parsers.reservation_response_parser import (
 from app.repositories import customer_repository, product_repository, snapshot_repository
 from app.services.booking_service import BookingError, BookingService, PreparationRequest
 from app.services.session_service import resolve_session
+from app.timefmt import format_local
 from app.ui.commands import Runtime, resolve_or_report
 from app.ui.prompts import PromptCancelled, TooManyAttempts, ask, ask_valid
-from app.ui.timefmt import format_local
 
 MARK_TARGETS: dict[str, BookingStatus] = {
     "draft": BookingStatus.DRAFT,
@@ -243,6 +243,14 @@ def run_open(runtime: Runtime, booking_id: int) -> int:
         for label, value in _describe(runtime, booking):
             console.print(f"{label}: {value}", markup=False, soft_wrap=True)
         console.print(f"Full contact details: customers show {booking.customer_id} --reveal")
+        with runtime.session_factory() as db:
+            cached = snapshot_repository.load_last_state(db, booking.session_slug)
+        if cached is not None and not cached[0].accepting:
+            as_of = format_local(cached[1], runtime.settings.app_timezone)
+            console.print(
+                f"Warning: the session was not accepting orders at the last check ({as_of}).",
+                style="yellow",
+            )
         url = _page_url(runtime, booking.session_slug)
         if not runtime.open_url(url):
             console.print(

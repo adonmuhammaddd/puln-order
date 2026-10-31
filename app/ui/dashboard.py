@@ -15,7 +15,7 @@ from app.clients.puln_client import LiveOk
 from app.constants import APP_NAME
 from app.services.monitor_service import MonitorState
 from app.services.stock_monitor import Severity, describe_result
-from app.ui.timefmt import format_local
+from app.timefmt import format_local
 
 EVENTS_SHOWN = 8
 
@@ -76,9 +76,39 @@ def _freshness_line(state: MonitorState, ctx: DashboardContext, now: datetime) -
     return line
 
 
+def format_duration(seconds: float) -> str:
+    total = max(0, int(seconds))
+    hours, rest = divmod(total, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m"
+    if minutes:
+        return f"{minutes}m {secs:02d}s"
+    return f"{secs}s"
+
+
+def _target_summary(state: MonitorState, ctx: DashboardContext) -> Text:
+    line = Text()
+    for product_id in sorted(ctx.target_ids):
+        name = state.product_names.get(product_id, f"Product #{product_id}")
+        product = state.last_valid.product(product_id) if state.last_valid else None
+        if line:
+            line.append("   ")
+        if state.last_valid is None:
+            line.append(f"{name}: NO DATA", style="bold red")
+        elif product is None:
+            line.append(f"{name}: NOT IN LIVE DATA", style="bold yellow")
+        elif product.stock_remaining > 0:
+            line.append(f"{name}: AVAILABLE {product.stock_remaining}", style="bold green")
+        else:
+            line.append(f"{name}: SOLD OUT", style="bold red")
+    return line
+
+
 def _header(state: MonitorState, ctx: DashboardContext, now: datetime) -> Group:
     lines = [
         Text(APP_NAME, style="bold"),
+        _target_summary(state, ctx),
         Text(f"Session: {state.session.slug}"),
         Text(f"Local time: {format_local(now, ctx.timezone)} ({ctx.timezone})"),
     ]
@@ -89,6 +119,16 @@ def _header(state: MonitorState, ctx: DashboardContext, now: datetime) -> Group:
             Text(f"Session status: {status.status}"),
             Text("Accepting orders: ").append_text(accepting),
             Text(f"Opens: {format_local(status.opens_at, ctx.timezone)}"),
+            *(
+                [
+                    Text(
+                        f"Opens in {format_duration((status.opens_at - now).total_seconds())}",
+                        style="bold cyan",
+                    )
+                ]
+                if not status.accepting and status.opens_at is not None and now < status.opens_at
+                else []
+            ),
             Text(f"Closes: {format_local(status.closes_at, ctx.timezone)}"),
             Text(f"Server time: {format_local(status.server_now, ctx.timezone)}"),
         ]
@@ -143,7 +183,7 @@ def _customers(ctx: DashboardContext) -> Group:
     )
 
 
-def _monitor(state: MonitorState, ctx: DashboardContext) -> Group:
+def _monitor(state: MonitorState, ctx: DashboardContext, now: datetime) -> Group:
     result = state.last_result
     if result is None:
         last_response = "-"
@@ -163,7 +203,11 @@ def _monitor(state: MonitorState, ctx: DashboardContext) -> Group:
     if state.stop_reason is not None:
         lines.append(Text(f"Monitoring stopped: {state.stop_reason}", style="bold red"))
     else:
-        lines.append(Text(f"Next check: {format_local(state.next_check_at, ctx.timezone)}"))
+        next_check = Text(f"Next check: {format_local(state.next_check_at, ctx.timezone)}")
+        if state.next_check_at is not None:
+            remaining = (state.next_check_at - now).total_seconds()
+            next_check.append(f" (in {format_duration(remaining)})" if remaining > 0 else " (due)")
+        lines.append(next_check)
     return Group(*lines)
 
 
@@ -190,7 +234,7 @@ def render_dashboard(state: MonitorState, ctx: DashboardContext, now: datetime) 
         spacer,
         _customers(ctx),
         spacer,
-        _monitor(state, ctx),
+        _monitor(state, ctx, now),
         spacer,
         _events(state, ctx),
     )

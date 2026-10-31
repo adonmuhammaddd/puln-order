@@ -226,3 +226,20 @@ def test_service_never_logs_personal_data(
     assert "example.test" not in caplog.text
     assert "812" not in caplog.text
     assert f"customer {customer.id}" in caplog.text
+
+
+def test_ensure_capacity_reports_limit_before_any_input(service: CustomerService) -> None:
+    for n in range(3):
+        service.create(synthetic(n), consent_confirmed=True)
+
+    with pytest.raises(CustomerLimitError):
+        service.ensure_capacity()
+
+
+def test_ensure_unique_checks_contacts_before_saving(service: CustomerService) -> None:
+    existing = service.create(synthetic(1), consent_confirmed=True)
+
+    with pytest.raises(DuplicateCustomerError, match="whatsapp"):
+        service.ensure_unique(whatsapp=synthetic(1).whatsapp, email=None)
+    service.ensure_unique(whatsapp=synthetic(1).whatsapp, email=None, exclude_id=existing.id)
+    service.ensure_unique(whatsapp=synthetic(2).whatsapp, email=synthetic(2).email)

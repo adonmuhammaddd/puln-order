@@ -94,8 +94,18 @@ def _add_reports(groups: Groups) -> None:
     kinds = history.add_subparsers(dest="action", required=True, metavar="KIND")
     for kind, text in (("stock", "Stock changes of a product"), ("slot", "Capacity of a slot")):
         kinds.add_parser(kind, help=text).add_argument("subject_id", type=int, metavar="ID")
+    exports = groups.add_parser("export", help="Write CSV files to data/exports")
+    kinds = exports.add_subparsers(dest="action", required=True, metavar="KIND")
+    bookings = kinds.add_parser("bookings", help="Bookings without contact details or notes")
+    bookings.add_argument("--all", action="store_true", help="Include every session")
+    bookings.add_argument(
+        "--with-names", action="store_true", help="Include customer display names"
+    )
+    kinds.add_parser("stock", help="Recorded stock changes of the session")
+    kinds.add_parser("slots", help="Recorded slot capacity changes of the session")
     db = _actions(groups, "db", "Local database maintenance")
     db.add_parser("init", help="Create the local SQLite database and tables")
+    db.add_parser("backup", help="Copy the database to data/backups")
 
 
 def build_parser() -> argparse.ArgumentParser:

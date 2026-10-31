@@ -24,8 +24,8 @@ from app.services.notification_service import Notifier
 from app.services.poll_policy import PollTiming
 from app.services.session_service import SessionConfigError, SessionRef, resolve_session
 from app.services.stock_monitor import ChangeEvent, describe_result
+from app.timefmt import format_local
 from app.ui.dashboard import DashboardContext, render_dashboard
-from app.ui.timefmt import format_local
 
 logger = logging.getLogger(__name__)
 

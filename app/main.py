@@ -86,6 +86,12 @@ def _dispatch_products(args: argparse.Namespace, runtime: commands.Runtime) -> i
     raise AssertionError(f"unhandled products action {args.action}")
 
 
+def _dispatch_db(args: argparse.Namespace, runtime: commands.Runtime) -> int:
+    if args.action == "backup":
+        return report_commands.run_db_backup(runtime)
+    return commands.run_db_init(runtime)
+
+
 def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
     match args.command:
         case "monitor":
@@ -110,8 +116,15 @@ def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
             return report_commands.run_report(runtime)
         case "history":
             return report_commands.run_history(runtime, args.action, args.subject_id)
+        case "export":
+            return report_commands.run_export(
+                runtime,
+                args.action,
+                all_sessions=getattr(args, "all", False),
+                with_names=getattr(args, "with_names", False),
+            )
         case "db":
-            return commands.run_db_init(runtime)
+            return _dispatch_db(args, runtime)
     raise AssertionError(f"unhandled command {args.command}")
 
 
