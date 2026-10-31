@@ -19,6 +19,7 @@ EXPECTED_TABLES = {
     "bookings",
     "monitor_checks",
     "live_states",
+    "booking_status_changes",
 }
 
 

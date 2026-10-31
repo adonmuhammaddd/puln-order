@@ -3,6 +3,8 @@
 import logging
 import random
 import time
+import webbrowser
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import httpx
@@ -38,6 +40,7 @@ class Runtime:
     console: Console
     error_console: Console
     transport: httpx.BaseTransport | None = None
+    open_url: Callable[[str], bool] = webbrowser.open
 
     def http_client(self) -> httpx.Client:
         return create_http_client(self.settings.puln_request_timeout_seconds, self.transport)
@@ -50,7 +53,7 @@ def run_db_init(runtime: Runtime) -> int:
     return 0
 
 
-def _resolve(runtime: Runtime) -> SessionRef | None:
+def resolve_or_report(runtime: Runtime) -> SessionRef | None:
     try:
         return resolve_session(runtime.settings)
     except SessionConfigError as error:
@@ -107,7 +110,7 @@ def _monitor_service(
 
 def run_status(runtime: Runtime) -> int:
     """Manual refresh: exactly one request, then print the dashboard."""
-    session = _resolve(runtime)
+    session = resolve_or_report(runtime)
     if session is None:
         return 2
     with runtime.http_client() as http:
@@ -120,7 +123,7 @@ def run_status(runtime: Runtime) -> int:
 
 
 def run_monitor_command(runtime: Runtime, *, keep_running: bool, bell: bool) -> int:
-    session = _resolve(runtime)
+    session = resolve_or_report(runtime)
     if session is None:
         return 2
     console = runtime.console
@@ -157,7 +160,7 @@ def run_monitor_command(runtime: Runtime, *, keep_running: bool, bell: bool) -> 
 
 
 def run_sessions_validate(runtime: Runtime) -> int:
-    session = _resolve(runtime)
+    session = resolve_or_report(runtime)
     if session is None:
         return 2
     console, tz = runtime.console, runtime.settings.app_timezone
@@ -232,4 +235,22 @@ def run_products_name(runtime: Runtime, product_id: int, name: str) -> int:
     runtime.console.print(
         f"Product {product.puln_product_id} is now named {product.name}", markup=False
     )
+    return 0
+
+
+def run_products_limit(runtime: Runtime, product_id: int, limit: str) -> int:
+    try:
+        max_quantity = None if limit.strip().lower() == "none" else int(limit)
+    except ValueError:
+        runtime.error_console.print("limit must be a whole number or none", markup=False)
+        return 2
+    with runtime.session_factory() as db:
+        try:
+            product = product_repository.set_max_quantity(db, product_id, max_quantity)
+        except ValueError as error:
+            runtime.error_console.print(str(error), markup=False)
+            return 2
+        db.commit()
+    shown = "no local limit" if product.max_quantity is None else f"max {product.max_quantity}"
+    runtime.console.print(f"Product {product_id}: {shown}", markup=False)
     return 0

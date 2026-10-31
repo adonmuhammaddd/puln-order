@@ -121,3 +121,21 @@ class LiveState(Base):
     session_slug: Mapped[str] = mapped_column(String(80), unique=True)
     payload: Mapped[str] = mapped_column(Text)
     observed_at: Mapped[datetime]
+
+
+class BookingStatusChange(Base):
+    """Audit trail: every status a booking has passed through, with the operator's note."""
+
+    __tablename__ = "booking_status_changes"
+    __table_args__ = (Index("ix_booking_status_changes_booking", "booking_id", "changed_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id"))
+    from_status: Mapped[BookingStatus | None] = mapped_column(
+        Enum(BookingStatus, native_enum=False, length=40, create_constraint=True)
+    )
+    to_status: Mapped[BookingStatus] = mapped_column(
+        Enum(BookingStatus, native_enum=False, length=40, create_constraint=True)
+    )
+    note: Mapped[str | None] = mapped_column(Text)
+    changed_at: Mapped[datetime]

@@ -59,6 +59,39 @@ uv run python -m app.main customers delete 1 --anonymize   # keep booking histor
   reactivated; add the customer again with fresh consent.
 - Logs refer to customers by ID only.
 
+### Bookings
+
+```bash
+uv run python -m app.main products limit 100 1        # per-person limit seen on the official page
+uv run python -m app.main bookings prepare            # interactive; shows last-known availability
+uv run python -m app.main bookings list [--all]
+uv run python -m app.main bookings show 1             # details + status history
+uv run python -m app.main bookings open 1             # opens the official page in your browser
+uv run python -m app.main bookings mark 1 submitted   # after completing the official form yourself
+uv run python -m app.main bookings mark 1 awaiting-email
+uv run python -m app.main bookings confirm 1          # only after checking the confirmation email
+uv run python -m app.main bookings mark 1 failed --note
+```
+
+Status flow:
+
+```text
+DRAFT -> READY -> OFFICIAL_FLOW_OPENED -> SUBMITTED_BY_USER -> (SUCCESS_PAGE_REVIEWED) -> AWAITING_EMAIL -> CONFIRMED
+```
+
+Open bookings can also become `FAILED` or `CANCELLED`; `CONFIRMED`, `FAILED` and `CANCELLED`
+are final. `READY` and `OFFICIAL_FLOW_OPENED` can step back for corrections.
+
+- `bookings open` only opens the official page. It never fills or submits the form, and any
+  security check is completed by a person in the browser.
+- `CONFIRMED` is reachable only through `bookings confirm`, from `AWAITING_EMAIL`, after the
+  operator states they checked the official confirmation email. HTTP 200 or a success page alone
+  is not enough.
+- One open booking per customer, product and session; cancel it before preparing another.
+- Quantity is checked against the local limit (`products limit`). Stock and slot capacity are
+  last-known values and only produce warnings.
+- Every status change is kept in the booking history.
+
 ### Session selection
 
 Precedence: `PULN_SESSION_URL` > `PULN_SESSION_SLUG` > `PULN_SESSION_DATE` (becomes

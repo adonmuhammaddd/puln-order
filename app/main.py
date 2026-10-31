@@ -3,7 +3,8 @@
 import argparse
 import logging
 import sys
-from collections.abc import Sequence
+import webbrowser
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import httpx
@@ -14,7 +15,7 @@ from app.config import Settings, load_settings
 from app.constants import APP_NAME, APP_VERSION
 from app.database.engine import create_session_factory, init_db, sqlite_file_path
 from app.logging_setup import configure_logging
-from app.ui import commands, customer_commands
+from app.ui import booking_commands, commands, customer_commands
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,28 @@ def build_parser() -> argparse.ArgumentParser:
     name = product_actions.add_parser("name", help="Set the display name of a product ID")
     name.add_argument("product_id", type=int)
     name.add_argument("name")
+    limit = product_actions.add_parser(
+        "limit", help="Set the per-person limit seen on the official page (or none)"
+    )
+    limit.add_argument("product_id", type=int)
+    limit.add_argument("max_quantity", metavar="N|none")
+
+    bookings = groups.add_parser("bookings", help="Reservation preparation and tracking")
+    booking_actions = bookings.add_subparsers(dest="action", required=True, metavar="ACTION")
+    booking_list = booking_actions.add_parser("list", help="Bookings for the configured session")
+    booking_list.add_argument("--all", action="store_true", help="Include every session")
+    booking_actions.add_parser("prepare", help="Prepare a booking for a customer (interactive)")
+    for action, text in (
+        ("show", "Show a booking and its history"),
+        ("open", "Open the official PULN page for a READY booking"),
+        ("confirm", "Mark CONFIRMED after verifying the confirmation email"),
+    ):
+        booking_action = booking_actions.add_parser(action, help=text)
+        booking_action.add_argument("booking_id", type=int)
+    mark = booking_actions.add_parser("mark", help="Record a manual status change")
+    mark.add_argument("booking_id", type=int)
+    mark.add_argument("status", choices=sorted(booking_commands.MARK_TARGETS))
+    mark.add_argument("--note", action="store_true", help="Add a note (asked interactively)")
 
     customers = groups.add_parser("customers", help="Customer profiles (max 10 active)")
     customer_actions = customers.add_subparsers(dest="action", required=True, metavar="ACTION")
@@ -110,6 +133,25 @@ def _dispatch_customers(args: argparse.Namespace, runtime: commands.Runtime) -> 
     raise AssertionError(f"unhandled customers action {args.action}")
 
 
+def _dispatch_bookings(args: argparse.Namespace, runtime: commands.Runtime) -> int:
+    match args.action:
+        case "list":
+            return booking_commands.run_list(runtime, all_sessions=args.all)
+        case "prepare":
+            return booking_commands.run_prepare(runtime)
+        case "show":
+            return booking_commands.run_show(runtime, args.booking_id)
+        case "open":
+            return booking_commands.run_open(runtime, args.booking_id)
+        case "mark":
+            return booking_commands.run_mark(
+                runtime, args.booking_id, args.status, with_note=args.note
+            )
+        case "confirm":
+            return booking_commands.run_confirm(runtime, args.booking_id)
+    raise AssertionError(f"unhandled bookings action {args.action}")
+
+
 def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
     match (args.command, getattr(args, "action", None)):
         case ("monitor", None):
@@ -124,6 +166,10 @@ def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
             return commands.run_products_list(runtime)
         case ("products", "name"):
             return commands.run_products_name(runtime, args.product_id, args.name)
+        case ("products", "limit"):
+            return commands.run_products_limit(runtime, args.product_id, args.max_quantity)
+        case ("bookings", _):
+            return _dispatch_bookings(args, runtime)
         case ("customers", _):
             return _dispatch_customers(args, runtime)
         case ("db", "init"):
@@ -131,8 +177,13 @@ def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
     raise AssertionError(f"unhandled command {args.command} {args.action}")
 
 
-def main(argv: Sequence[str] | None = None, *, transport: httpx.BaseTransport | None = None) -> int:
-    """Run the CLI. ``transport`` lets tests replace the network; production passes nothing."""
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    transport: httpx.BaseTransport | None = None,
+    open_url: Callable[[str], bool] | None = None,
+) -> int:
+    """Run the CLI. Tests replace the network and the browser; production passes nothing."""
     args = build_parser().parse_args(argv)
     console = Console()
     error_console = Console(stderr=True)
@@ -153,6 +204,7 @@ def main(argv: Sequence[str] | None = None, *, transport: httpx.BaseTransport | 
         console=console,
         error_console=error_console,
         transport=transport,
+        open_url=open_url or webbrowser.open,
     )
     try:
         return _dispatch(args, runtime)

@@ -228,3 +228,26 @@ def test_counts_active_customers_and_bookings(db_session: Session) -> None:
     assert customer_repository.count_active(db_session) == 1
     assert booking_repository.count_prepared(db_session) == 2
     assert booking_repository.count_confirmed(db_session) == 1
+
+
+def test_set_max_quantity_for_known_product(db_session: Session) -> None:
+    product_repository.seed_known_products(db_session)
+
+    product_repository.set_max_quantity(db_session, 100, 2)
+    assert product_repository.get_product(db_session, 100).max_quantity == 2  # type: ignore[union-attr]
+
+    product_repository.set_max_quantity(db_session, 100, None)
+    assert product_repository.get_product(db_session, 100).max_quantity is None  # type: ignore[union-attr]
+
+
+def test_set_max_quantity_requires_catalogue_entry(db_session: Session) -> None:
+    with pytest.raises(ValueError, match="products name"):
+        product_repository.set_max_quantity(db_session, 555, 1)
+
+
+@pytest.mark.parametrize("value", [0, -1])
+def test_set_max_quantity_rejects_non_positive(db_session: Session, value: int) -> None:
+    product_repository.seed_known_products(db_session)
+
+    with pytest.raises(ValueError, match="at least 1"):
+        product_repository.set_max_quantity(db_session, 100, value)

@@ -11,7 +11,7 @@ from app.database.tables import Product
 _MAX_NAME_LENGTH = 160
 
 
-def _get(session: Session, product_id: int) -> Product | None:
+def get_product(session: Session, product_id: int) -> Product | None:
     return session.scalars(
         select(Product).where(Product.puln_product_id == product_id)
     ).one_or_none()
@@ -20,7 +20,7 @@ def _get(session: Session, product_id: int) -> Product | None:
 def seed_known_products(session: Session) -> None:
     """Add observed products that are missing. Never overwrites operator edits."""
     for product_id, (name, max_quantity) in KNOWN_PRODUCTS.items():
-        if _get(session, product_id) is None:
+        if get_product(session, product_id) is None:
             session.add(Product(puln_product_id=product_id, name=name, max_quantity=max_quantity))
     session.flush()
 
@@ -29,12 +29,24 @@ def set_product_name(session: Session, product_id: int, name: str) -> Product:
     cleaned = name.strip()
     if not cleaned or len(cleaned) > _MAX_NAME_LENGTH:
         raise ValueError(f"product name must be 1-{_MAX_NAME_LENGTH} characters")
-    product = _get(session, product_id)
+    product = get_product(session, product_id)
     if product is None:
         product = Product(puln_product_id=product_id, name=cleaned)
         session.add(product)
     else:
         product.name = cleaned
+    session.flush()
+    return product
+
+
+def set_max_quantity(session: Session, product_id: int, max_quantity: int | None) -> Product:
+    """Set the per-person limit observed on the official page (None means unknown)."""
+    if max_quantity is not None and max_quantity < 1:
+        raise ValueError("max quantity must be at least 1")
+    product = get_product(session, product_id)
+    if product is None:
+        raise ValueError(f"product {product_id} is not in the catalogue; run products name first")
+    product.max_quantity = max_quantity
     session.flush()
     return product
 

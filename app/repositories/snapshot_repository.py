@@ -111,3 +111,11 @@ def load_last_state(session: Session, slug: str) -> tuple[LiveStatus, datetime] 
     if row is None:
         return None
     return LiveStatus.model_validate_json(row.payload), row.observed_at
+
+
+def get_pickup_slot(session: Session, slug: str, slot_id: int) -> PickupSlot | None:
+    return session.scalars(
+        select(PickupSlot).where(
+            PickupSlot.session_slug == slug, PickupSlot.puln_slot_id == slot_id
+        )
+    ).one_or_none()

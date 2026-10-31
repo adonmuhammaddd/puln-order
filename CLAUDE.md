@@ -41,6 +41,10 @@ The system `python3` on this Mac is 3.9.6. Always use `uv run` (pinned 3.12 via 
   `CustomerError` subclasses whose messages are safe to show. Never log personal data.
 - `app/ui/prompts.py` + `customer_commands.py`: personal data only via prompts (not flags).
   CLI tests feed answers by monkeypatching `builtins.input`.
+- `app/models/booking.py`: `ALLOWED_TRANSITIONS` is the single source of status rules;
+  `BookingService.transition` refuses CONFIRMED, only `confirm(email_verified=True)` sets it.
+  Every change writes a `BookingStatusChange` row. `bookings open` uses `Runtime.open_url`
+  (tests inject a fake; `main(open_url=...)`).
 - `app/repositories/`: module functions taking a `Session`; they flush, callers commit.
 - `app/ui/dashboard.py`: pure render (`render_dashboard`), tested with `Console(record=True)`.
 - `app/ui/commands.py`: CLI handlers return exit codes; `app/main.py` builds the argparse CLI and
