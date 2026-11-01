@@ -82,6 +82,7 @@ def make_runtime(
 
 def test_evaluate_opens_only_first_eligible_booking(tmp_path: Path) -> None:
     opened: list[str] = []
+
     def open_url(url: str) -> bool:
         opened.append(url)
         return True
