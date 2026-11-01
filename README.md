@@ -27,6 +27,7 @@ uv run python -m app.main db init
 
 ```bash
 uv run python -m app.main sessions validate   # does the session exist and is live.json valid?
+uv run python -m app.main products sync         # map this session's actual product IDs from its HTML
 uv run python -m app.main bookings prepare    # per customer, before the session opens
 uv run python -m app.main monitor --desktop --auto-open   # live stock + READY-order assessment; opens official tabs
 uv run python -m app.main bookings open --all-ready       # or open them yourself
@@ -45,8 +46,9 @@ uv run python -m app.main sessions validate     # one check of the session page 
 uv run python -m app.main status                # manual refresh: one request, print dashboard
 uv run python -m app.main monitor               # live dashboard until the session closes
 uv run python -m app.main monitor --keep-running --no-bell
+uv run python -m app.main products sync        # refresh the session-scoped product mapping
 uv run python -m app.main products list
-uv run python -m app.main products name 102 "Product name from the official page"
+uv run python -m app.main products name 102 "Legacy product name"
 uv run python -m app.main db init
 ```
 
@@ -97,7 +99,8 @@ uv run python -m app.main customers delete 1 --anonymize   # keep booking histor
 ### Bookings
 
 ```bash
-uv run python -m app.main products limit 100 1        # per-person limit seen on the official page
+uv run python -m app.main products limit 100 1        # legacy/manual catalogue only
+uv run python -m app.main products sync               # read the current session catalogue first
 uv run python -m app.main bookings prepare            # interactive; shows last-known availability
 uv run python -m app.main bookings list [--all]
 uv run python -m app.main bookings workflow [--all]  # status + next operator action
@@ -126,7 +129,10 @@ are final. `READY` and `OFFICIAL_FLOW_OPENED` can step back for corrections.
   operator states they checked the official confirmation email. HTTP 200 or a success page alone
   is not enough.
 - One open booking per customer, product and session; cancel it before preparing another.
-- Quantity is checked against the local limit (`products limit`). Stock and slot capacity are
+- For the active session, product IDs and limits come from `products sync`; a blank official
+  `data-max-per` is treated as unknown (not as 1, and never inferred from the sold-out input max).
+  Session product IDs are scoped by session so a new daily ID cannot relabel an old booking.
+  `products limit` remains for legacy/manual catalogue entries. Stock and slot capacity are
   last-known values and only produce warnings.
 - Every status change is kept in the booking history.
 
