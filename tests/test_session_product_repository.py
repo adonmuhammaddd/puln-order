@@ -35,3 +35,15 @@ def test_sync_updates_id_for_same_variant_within_session(db_session: Session) ->
     products = session_product_repository.list_for_session(db_session, "session")
     assert len(products) == 1
     assert products[0].puln_product_id == 105
+
+
+
+def test_sync_deactivates_products_missing_from_latest_page(db_session: Session) -> None:
+    target = CatalogueProduct(105, "kataifi-rolls", "Kataifi Crunch (Personal)", None, None, None)
+    other = CatalogueProduct(106, "puln-product-106", "Other", None, None, None)
+    session_product_repository.upsert_catalogue(db_session, "session", [target, other])
+    session_product_repository.upsert_catalogue(db_session, "session", [other])
+
+    current = session_product_repository.list_for_session(db_session, "session")
+    assert [product.puln_product_id for product in current] == [106]
+    assert session_product_repository.get_by_id(db_session, "session", 105) is None
