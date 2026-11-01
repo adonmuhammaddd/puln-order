@@ -62,6 +62,9 @@ def parse_catalogue(html: bytes | str) -> tuple[CatalogueProduct, ...]:
         )
         price_node = item.select_one("[data-price]")
         stock_node = item.select_one("[data-stock]")
+        raw_stock = item.get("data-stock")
+        if raw_stock is None and stock_node is not None:
+            raw_stock = stock_node.get("data-stock")
         max_per = item.get("data-max-per")
         products.append(
             CatalogueProduct(
@@ -69,9 +72,7 @@ def parse_catalogue(html: bytes | str) -> tuple[CatalogueProduct, ...]:
                 variant_key=key,
                 name=name,
                 price=_price(str(price_node.get("data-price")) if price_node else None),
-                stock_remaining=_optional_int(
-                    str(stock_node.get("data-stock")) if stock_node else None
-                ),
+                stock_remaining=_optional_int(str(raw_stock) if raw_stock is not None else None),
                 max_quantity=_optional_int(str(max_per) if max_per is not None else None),
             )
         )
