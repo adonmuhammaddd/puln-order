@@ -14,7 +14,7 @@ from rich.console import Console
 from app.config import Settings, load_settings
 from app.database.engine import create_session_factory, init_db, sqlite_file_path
 from app.logging_setup import configure_logging
-from app.ui import booking_commands, commands, customer_commands, report_commands
+from app.ui import booking_commands, commands, customer_commands, order_commands, report_commands
 from app.ui.cli_parser import build_parser
 
 logger = logging.getLogger(__name__)
@@ -106,8 +106,6 @@ def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
                 auto_open=args.auto_open,
             )
         case "orders":
-            from app.ui import order_commands
-
             if args.action == "evaluate":
                 return order_commands.run_evaluate(runtime, open_next=args.open_next)
             raise AssertionError(f"unhandled orders action {args.action}")
