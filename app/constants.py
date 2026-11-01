@@ -14,4 +14,4 @@ USER_AGENT = f"PULN-Order-Assistant/{APP_VERSION} (personal monitoring tool)"
 
 # Products observed on the official page: (name, observed max quantity per person).
 # Seeded only when missing; recheck against the current page for each session.
-KNOWN_PRODUCTS: dict[int, tuple[str, int | None]] = {100: ("Kataifi Rolls", 1)}
+KNOWN_PRODUCTS: dict[int, tuple[str, int | None]] = {}
