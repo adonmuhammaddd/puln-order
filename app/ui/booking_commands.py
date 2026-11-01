@@ -16,7 +16,12 @@ from app.parsers.reservation_response_parser import (
     parse_reservation_response,
     read_response_file,
 )
-from app.repositories import customer_repository, product_repository, session_product_repository, snapshot_repository
+from app.repositories import (
+    customer_repository,
+    product_repository,
+    session_product_repository,
+    snapshot_repository,
+)
 from app.services.booking_service import BookingError, BookingService, PreparationRequest
 from app.services.browser_service import open_ready_bookings
 from app.services.session_service import resolve_session
@@ -87,7 +92,10 @@ def _print_choices(runtime: Runtime, slug: str) -> None:
     console.print("Products (active session):", style="bold")
     for product in session_products:
         limit = "limit unknown" if product.max_quantity is None else f"max {product.max_quantity}"
-        console.print(f"  {product.puln_product_id}  {product.name}, {limit} [{product.variant_key}]", markup=False)
+        console.print(
+            f"  {product.puln_product_id}  {product.name}, {limit} [{product.variant_key}]",
+            markup=False,
+        )
     if not session_products:
         console.print("  No session catalogue yet; run products sync.", style="yellow")
     console.print("Legacy products:", style="bold")
@@ -111,9 +119,14 @@ def run_prepare(runtime: Runtime) -> int:
         _print_choices(runtime, service.session_slug)
         with runtime.session_factory() as db:
             session_products = session_product_repository.list_for_session(db, service.session_slug)
-        target_product = next((p for p in session_products if p.variant_key == "kataifi-rolls"), None)
+        target_product = next(
+            (p for p in session_products if p.variant_key == "kataifi-rolls"), None
+        )
         if target_product is None:
-            console.print("Target product is not mapped for this session. Run: products sync", style="yellow")
+            console.print(
+                "Target product is not mapped for this session. Run: products sync",
+                style="yellow",
+            )
             return 1
         default_product = target_product.puln_product_id
         customer_id = ask_valid(console, "Customer ID", _whole_number)
@@ -177,7 +190,9 @@ def run_list(runtime: Runtime, *, all_sessions: bool) -> int:
                 customers.get(booking.customer_id, f"#{booking.customer_id}"),
                 names_by_session.get(booking.session_slug, {}).get(
                     booking.puln_product_id,
-                    legacy_names.get(booking.puln_product_id, f"Product #{booking.puln_product_id}"),
+                    legacy_names.get(
+                        booking.puln_product_id, f"Product #{booking.puln_product_id}"
+                    ),
                 ),
                 str(booking.quantity),
                 "-" if booking.puln_slot_id is None else str(booking.puln_slot_id),
