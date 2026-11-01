@@ -331,7 +331,9 @@ def run_products_sync(runtime: Runtime) -> int:
     runtime.console.print(table)
     target = next((p for p in products if p.variant_key == "kataifi-rolls"), None)
     if target is None:
-        runtime.error_console.print("Target variant kataifi-rolls was not found in this session.", markup=False)
+        runtime.error_console.print(
+            "Target variant kataifi-rolls was not found in this session.", markup=False
+        )
         return 1
     runtime.console.print(
         f"Target resolved: Kataifi Rolls -> {target.name} (Product ID {target.puln_product_id})",
