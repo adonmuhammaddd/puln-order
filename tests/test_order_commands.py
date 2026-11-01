@@ -86,9 +86,7 @@ def test_evaluate_opens_only_first_eligible_booking(tmp_path: Path) -> None:
         opened.append(url)
         return True
 
-    runtime, bookings, booking, output, engine = make_runtime(
-        tmp_path, open_url=open_url
-    )
+    runtime, bookings, booking, output, engine = make_runtime(tmp_path, open_url=open_url)
     try:
         assert run_evaluate(runtime, open_next=True) == 0
         assert opened == [f"https://puln.seatin.id/c/{SLUG}"]
