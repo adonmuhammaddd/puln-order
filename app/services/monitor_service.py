@@ -64,6 +64,7 @@ class MonitorService:
         clock: Callable[[], datetime],
         rng: random.Random,
         on_event: Callable[[ChangeEvent], None],
+        on_live: Callable[[LiveOk], None] | None = None,
     ) -> None:
         self._client = client
         self._session_factory = session_factory
@@ -73,6 +74,7 @@ class MonitorService:
         self._clock = clock
         self._rng = rng
         self._on_event = on_event
+        self._on_live = on_live
         self._health = HealthTracker()
         self._drift = DriftTracker()
         self._catalogue_loaded = False
@@ -166,6 +168,11 @@ class MonitorService:
             )
             state.last_valid, state.last_valid_at = result.status, started_at
             state.last_valid_is_cached = False
+            if self._on_live is not None:
+                try:
+                    self._on_live(result)
+                except Exception:
+                    logger.exception("live monitoring callback failed")
 
         decision = decide_next(
             result,
