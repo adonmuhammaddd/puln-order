@@ -109,10 +109,13 @@ def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
             if args.action == "evaluate":
                 return order_commands.run_evaluate(runtime, open_next=args.open_next)
             raise AssertionError(f"unhandled orders action {args.action}")
-        case "status":
-            return commands.run_status(runtime)
-        case "sessions":
-            return commands.run_sessions_validate(runtime)
+        case "status" | "sessions":
+            handler = (
+                commands.run_status
+                if args.command == "status"
+                else commands.run_sessions_validate
+            )
+            return handler(runtime)
         case "products":
             return _dispatch_products(args, runtime)
         case "customers":
