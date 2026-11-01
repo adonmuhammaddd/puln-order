@@ -156,7 +156,14 @@ def run_list(runtime: Runtime, *, all_sessions: bool) -> int:
     def action(service: BookingService) -> int:
         bookings = service.list_bookings(all_sessions=all_sessions)
         with runtime.session_factory() as db:
-            names = product_repository.product_names(db)
+            legacy_names = product_repository.product_names(db)
+            names_by_session = {
+                booking.session_slug: {
+                    p.puln_product_id: p.name
+                    for p in session_product_repository.list_for_session(db, booking.session_slug)
+                }
+                for booking in bookings
+            }
             customers = {c.id: c.display_name for c in customer_repository.list_customers(db)}
         table = Table(
             title=f"BOOKINGS ({'all sessions' if all_sessions else service.session_slug})",
@@ -168,7 +175,10 @@ def run_list(runtime: Runtime, *, all_sessions: bool) -> int:
             table.add_row(
                 str(booking.id),
                 customers.get(booking.customer_id, f"#{booking.customer_id}"),
-                names.get(booking.puln_product_id, f"Product #{booking.puln_product_id}"),
+                names_by_session.get(booking.session_slug, {}).get(
+                    booking.puln_product_id,
+                    legacy_names.get(booking.puln_product_id, f"Product #{booking.puln_product_id}"),
+                ),
                 str(booking.quantity),
                 "-" if booking.puln_slot_id is None else str(booking.puln_slot_id),
                 booking.status,
@@ -433,7 +443,9 @@ def run_review(runtime: Runtime, booking_id: int, file: str) -> int:
         _print_review(runtime, review)
 
         with runtime.session_factory() as db:
-            product = product_repository.get_product(db, booking.puln_product_id)
+            product = session_product_repository.get_by_id(
+                db, booking.session_slug, booking.puln_product_id
+            ) or product_repository.get_product(db, booking.puln_product_id)
             slot = (
                 None
                 if booking.puln_slot_id is None
