@@ -58,7 +58,12 @@ def booking_service(session_factory: sessionmaker[Session]) -> BookingService:
     return BookingService(session_factory, session_slug=SLUG)
 
 
-def prepare(booking_service: BookingService, customer_id: int, *, slot_id: int | None = 185) -> Booking:
+def prepare(
+    booking_service: BookingService,
+    customer_id: int,
+    *,
+    slot_id: int | None = 185,
+) -> Booking:
     return booking_service.prepare(
         PreparationRequest(
             customer_id=customer_id,
@@ -89,7 +94,11 @@ def make_orchestrator(
 ) -> OrderOrchestrator:
     adapter = SimpleNamespace(
         inspect=lambda session: SimpleNamespace(
-            page=PageCheck(reachable, 200 if reachable else 503, "session page found" if reachable else "HTTP 503"),
+            page=PageCheck(
+                reachable,
+                200 if reachable else 503,
+                "session page found" if reachable else "HTTP 503",
+            ),
             live=live or make_live(),
         )
     )
@@ -128,7 +137,11 @@ def test_queue_is_fifo_and_rejects_overflow() -> None:
 
 
 def test_orchestrator_rejects_mismatched_session(booking_service: BookingService) -> None:
-    other = SessionRef("another", "https://puln.seatin.id/c/another", "https://puln.seatin.id/c/another/live.json")
+    other = SessionRef(
+        "another",
+        "https://puln.seatin.id/c/another",
+        "https://puln.seatin.id/c/another/live.json",
+    )
     with pytest.raises(ValueError, match="same slug"):
         OrderOrchestrator(session=other, backend=object(), bookings=booking_service)  # type: ignore[arg-type]
 
