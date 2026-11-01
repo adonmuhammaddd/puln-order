@@ -92,7 +92,7 @@ def _session_target_ids(runtime: Runtime, session_slug: str) -> frozenset[int]:
         mapped = session_product_repository.list_for_session(db, session_slug)
     if mapped:
         return frozenset(p.puln_product_id for p in mapped if p.variant_key == "kataifi-rolls")
-    return frozenset(runtime.settings.target_product_ids)
+    return frozenset()
 
 
 def _monitor_service(
@@ -342,7 +342,10 @@ def run_products_sync(runtime: Runtime) -> int:
 
 
 def run_products_list(runtime: Runtime) -> int:
-    session = resolve_or_report(runtime)
+    try:
+        session = resolve_session(runtime.settings)
+    except SessionConfigError:
+        session = None
     session_products = []
     if session is not None:
         with runtime.session_factory() as db:
