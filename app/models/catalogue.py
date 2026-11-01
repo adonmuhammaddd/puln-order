@@ -1,8 +1,8 @@
 """Session-scoped product catalogue parsing."""
 
+import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-import re
 
 from bs4 import BeautifulSoup
 
@@ -50,19 +50,29 @@ def parse_catalogue(html: bytes | str) -> tuple[CatalogueProduct, ...]:
         if product_id < 1 or product_id in seen:
             continue
         heading = item.select_one("h1, h2, h3, h4")
-        name = str(item.get("data-name") or (heading.get_text(" ", strip=True) if heading else "")).strip()
+        heading_name = heading.get_text(" ", strip=True) if heading else ""
+        name = str(item.get("data-name") or heading_name).strip()
         if not name:
             continue
         seen.add(product_id)
-        key = "kataifi-rolls" if name.casefold() == "kataifi crunch (personal)" else re.sub(r"[^a-z0-9]+", "-", name.casefold()).strip("-")
+        key = (
+            "kataifi-rolls"
+            if name.casefold() == "kataifi crunch (personal)"
+            else re.sub(r"[^a-z0-9]+", "-", name.casefold()).strip("-")
+        )
         price_node = item.select_one("[data-price]")
         stock_node = item.select_one("[data-stock]")
-        products.append(CatalogueProduct(
-            puln_product_id=product_id,
-            variant_key=key,
-            name=name,
-            price=_price(str(price_node.get("data-price")) if price_node else None),
-            stock_remaining=_optional_int(str(stock_node.get("data-stock")) if stock_node else None),
-            max_quantity=_optional_int(str(item.get("data-max-per")) if item.get("data-max-per") is not None else None),
-        ))
+        max_per = item.get("data-max-per")
+        products.append(
+            CatalogueProduct(
+                puln_product_id=product_id,
+                variant_key=key,
+                name=name,
+                price=_price(str(price_node.get("data-price")) if price_node else None),
+                stock_remaining=_optional_int(
+                    str(stock_node.get("data-stock")) if stock_node else None
+                ),
+                max_quantity=_optional_int(str(max_per) if max_per is not None else None),
+            )
+        )
     return tuple(products)
