@@ -7,10 +7,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.clients.puln_client import LiveOk, PageCheck
 from app.database.engine import create_session_factory, init_db
+from app.database.tables import Booking
 from app.models.booking import BookingStatus
 from app.models.customer import CustomerInput
 from app.models.execution_result import ExecutionOutcome
-from app.models.puln import LiveStatus, parse_live_status
+from app.models.puln import parse_live_status
 from app.repositories import product_repository, snapshot_repository
 from app.services.booking_service import BookingService, PreparationRequest
 from app.services.customer_service import CustomerService
@@ -57,7 +58,7 @@ def booking_service(session_factory: sessionmaker[Session]) -> BookingService:
     return BookingService(session_factory, session_slug=SLUG)
 
 
-def prepare(booking_service: BookingService, customer_id: int, *, slot_id: int | None = 185):
+def prepare(booking_service: BookingService, customer_id: int, *, slot_id: int | None = 185) -> Booking:
     return booking_service.prepare(
         PreparationRequest(
             customer_id=customer_id,
@@ -79,7 +80,7 @@ def make_live(*, accepting: bool = True, stock: int = 5, slot_remaining: int = 5
     return LiveOk(200, 10, status, frozenset())
 
 
-def make_orchestrator(booking_service, live=None, *, reachable=True, queue=None):
+def make_orchestrator(\n    booking_service: BookingService,\n    live: object | None = None,\n    *,\n    reachable: bool = True,\n    queue: OrderQueue | None = None,\n) -> OrderOrchestrator:
     adapter = SimpleNamespace(
         inspect=lambda session: SimpleNamespace(
             page=PageCheck(reachable, 200 if reachable else 503, "session page found" if reachable else "HTTP 503"),
@@ -94,7 +95,7 @@ def make_orchestrator(booking_service, live=None, *, reachable=True, queue=None)
     )
 
 
-def test_enqueue_only_ready_bookings_and_is_idempotent(booking_service, customer_id) -> None:
+def test_enqueue_only_ready_bookings_and_is_idempotent(\n    booking_service: BookingService, customer_id: int\n) -> None:
     first = prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service)
 
@@ -118,13 +119,13 @@ def test_queue_is_fifo_and_rejects_overflow() -> None:
     assert queue.peek_all() == (11,)
 
 
-def test_orchestrator_rejects_mismatched_session(booking_service) -> None:
+def test_orchestrator_rejects_mismatched_session(booking_service: BookingService) -> None:
     other = SessionRef("another", "https://puln.seatin.id/c/another", "https://puln.seatin.id/c/another/live.json")
     with pytest.raises(ValueError, match="same slug"):
         OrderOrchestrator(session=other, backend=object(), bookings=booking_service)  # type: ignore[arg-type]
 
 
-def test_evaluate_marks_available_booking_ready_for_operator(booking_service, customer_id) -> None:
+def test_evaluate_marks_available_booking_ready_for_operator(\n    booking_service: BookingService, customer_id: int\n) -> None:
     booking = prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service)
     orchestrator.enqueue_ready_bookings()
@@ -137,7 +138,7 @@ def test_evaluate_marks_available_booking_ready_for_operator(booking_service, cu
     assert booking_service.get(booking.id).status is BookingStatus.READY
 
 
-def test_evaluate_waits_when_session_not_accepting(booking_service, customer_id) -> None:
+def test_evaluate_waits_when_session_not_accepting(\n    booking_service: BookingService, customer_id: int\n) -> None:
     prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service, make_live(accepting=False))
     orchestrator.enqueue_ready_bookings()
@@ -145,7 +146,7 @@ def test_evaluate_waits_when_session_not_accepting(booking_service, customer_id)
     assert orchestrator.evaluate_queue()[0].outcome is ExecutionOutcome.WAITING_FOR_OPENING
 
 
-def test_evaluate_does_not_claim_stock_when_empty(booking_service, customer_id) -> None:
+def test_evaluate_does_not_claim_stock_when_empty(\n    booking_service: BookingService, customer_id: int\n) -> None:
     prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service, make_live(stock=0))
     orchestrator.enqueue_ready_bookings()
@@ -153,7 +154,7 @@ def test_evaluate_does_not_claim_stock_when_empty(booking_service, customer_id) 
     assert orchestrator.evaluate_queue()[0].outcome is ExecutionOutcome.OUT_OF_STOCK
 
 
-def test_evaluate_blocks_when_slot_is_full(booking_service, customer_id) -> None:
+def test_evaluate_blocks_when_slot_is_full(\n    booking_service: BookingService, customer_id: int\n) -> None:
     prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service, make_live(slot_remaining=0))
     orchestrator.enqueue_ready_bookings()
@@ -161,7 +162,7 @@ def test_evaluate_blocks_when_slot_is_full(booking_service, customer_id) -> None
     assert orchestrator.evaluate_queue()[0].outcome is ExecutionOutcome.SLOT_FULL
 
 
-def test_evaluate_blocks_when_session_page_is_unavailable(booking_service, customer_id) -> None:
+def test_evaluate_blocks_when_session_page_is_unavailable(\n    booking_service: BookingService, customer_id: int\n) -> None:
     prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service, reachable=False)
     orchestrator.enqueue_ready_bookings()
@@ -169,7 +170,7 @@ def test_evaluate_blocks_when_session_page_is_unavailable(booking_service, custo
     assert orchestrator.evaluate_queue()[0].outcome is ExecutionOutcome.SESSION_UNAVAILABLE
 
 
-def test_evaluate_blocks_untrusted_live_payload(booking_service, customer_id) -> None:
+def test_evaluate_blocks_untrusted_live_payload(\n    booking_service: BookingService, customer_id: int\n) -> None:
     prepare(booking_service, customer_id)
     bad_live = SimpleNamespace(outcome="invalid")
     orchestrator = make_orchestrator(booking_service, bad_live)
@@ -178,7 +179,7 @@ def test_evaluate_blocks_untrusted_live_payload(booking_service, customer_id) ->
     assert orchestrator.evaluate_queue()[0].outcome is ExecutionOutcome.LIVE_DATA_UNAVAILABLE
 
 
-def test_stale_queue_booking_is_not_marked_ready(booking_service, customer_id) -> None:
+def test_stale_queue_booking_is_not_marked_ready(\n    booking_service: BookingService, customer_id: int\n) -> None:
     booking = prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service)
     orchestrator.enqueue_ready_bookings()
