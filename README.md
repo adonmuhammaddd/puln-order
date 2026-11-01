@@ -50,6 +50,27 @@ uv run python -m app.main products name 102 "Product name from the official page
 uv run python -m app.main db init
 ```
 
+### Order evaluation
+
+Assess every READY booking against one fresh, read-only check of the official session:
+
+```bash
+uv run python -m app.main orders evaluate
+```
+
+To open the official page for only the first booking whose latest stock and pickup-slot
+assessment is eligible:
+
+```bash
+uv run python -m app.main orders evaluate --open-next
+```
+
+This is a point-in-time assessment, not a stock hold or reservation. The optional browser
+handoff opens the official page and moves that booking to `OFFICIAL_FLOW_OPENED`; the operator
+must complete the form and any security check directly. The command never fills or submits a
+form. After completing the official flow, record the action with `bookings mark <id> submitted`.
+The in-memory FIFO queue is reconstructed from READY bookings each time the command runs.
+
 ### Customers
 
 ```bash
