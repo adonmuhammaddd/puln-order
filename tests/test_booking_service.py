@@ -1,6 +1,6 @@
 import logging
-from decimal import Decimal
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -15,7 +15,11 @@ from app.parsers.reservation_response_parser import (
     ReservationReview,
     parse_reservation_response,
 )
-from app.repositories import product_repository, session_product_repository, snapshot_repository
+from app.repositories import (
+    product_repository,
+    session_product_repository,
+    snapshot_repository,
+)
 from app.services.booking_service import (
     AVAILABILITY_WARNING,
     BookingNotFoundError,
