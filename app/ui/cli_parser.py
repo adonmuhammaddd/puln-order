@@ -49,6 +49,7 @@ def _add_monitoring(groups: Groups) -> None:
 def _add_products(groups: Groups) -> None:
     products = _actions(groups, "products", "Local product catalogue")
     products.add_parser("list", help="List known products and targets")
+    products.add_parser("sync", help="Read and map product IDs from the active session page")
     name = products.add_parser("name", help="Set the display name of a product ID")
     name.add_argument("product_id", type=int)
     name.add_argument("name")
