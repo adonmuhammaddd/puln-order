@@ -172,7 +172,9 @@ WORKFLOW_NEXT: dict[BookingStatus, str] = {
     BookingStatus.OFFICIAL_FLOW_OPENED: (
         "Complete the official form yourself; then mark submitted"
     ),
-    BookingStatus.SUBMITTED_BY_USER: "Review the saved result page, or mark awaiting-email",
+    BookingStatus.SUBMITTED_BY_USER: (
+        "Review the saved result page, or mark awaiting-email"
+    ),
     BookingStatus.SUCCESS_PAGE_REVIEWED: "Mark awaiting-email and wait for the email",
     BookingStatus.AWAITING_EMAIL: (
         "Verify the official confirmation email, then run bookings confirm"
