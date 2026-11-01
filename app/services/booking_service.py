@@ -115,7 +115,8 @@ class BookingService:
             product = product_repository.get_product(db, request.product_id)
         if product is None:
             raise BookingValidationError(
-                f"product {request.product_id} is not in the catalogue for session {self._slug}; run products sync"
+                f"product {request.product_id} is not in the catalogue for session "
+                f"{self._slug}; run products sync"
             )
         if request.quantity < 1:
             raise BookingValidationError("quantity must be at least 1")
