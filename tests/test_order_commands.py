@@ -1,6 +1,6 @@
+import json
 from collections.abc import Callable
 from io import StringIO
-import json
 from pathlib import Path
 
 import httpx
