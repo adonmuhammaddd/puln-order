@@ -1,5 +1,9 @@
 """Order orchestration commands for read-only availability and operator handoff."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from rich.table import Table
 
 from app.adapters.backend import PulnReadOnlyBackendAdapter
@@ -8,7 +12,10 @@ from app.models.booking import BookingStatus
 from app.models.execution_result import ExecutionOutcome
 from app.services.booking_service import BookingService
 from app.services.order_orchestrator import OrderOrchestrator
-from app.ui.commands import Runtime, resolve_or_report
+from app.ui.commands import resolve_or_report
+
+if TYPE_CHECKING:
+    from app.ui.commands import Runtime
 
 
 def run_evaluate(runtime: Runtime, *, open_next: bool = False) -> int:
