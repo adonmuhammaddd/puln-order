@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from app.adapters.backend import SessionBackendAdapter
 from app.clients.puln_client import LiveOk
 from app.models.booking import BookingStatus
-from app.models.puln import LiveStatus
 from app.models.execution_result import ExecutionOutcome, ExecutionResult
+from app.models.puln import LiveStatus
 from app.services.booking_service import BookingService
 from app.services.order_queue import OrderQueue, OrderQueueFullError
 from app.services.session_service import SessionRef
