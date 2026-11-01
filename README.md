@@ -28,7 +28,7 @@ uv run python -m app.main db init
 ```bash
 uv run python -m app.main sessions validate   # does the session exist and is live.json valid?
 uv run python -m app.main bookings prepare    # per customer, before the session opens
-uv run python -m app.main monitor --desktop --auto-open   # own terminal tab; opens a tab per READY booking
+uv run python -m app.main monitor --desktop --auto-open   # live stock + READY-order assessment; opens official tabs
 uv run python -m app.main bookings open --all-ready       # or open them yourself
 uv run python -m app.main bookings mark 1 submitted
 uv run python -m app.main bookings review 1 ~/Downloads/reservasi.html
@@ -182,7 +182,7 @@ Precedence: `PULN_SESSION_URL` > `PULN_SESSION_SLUG` > `PULN_SESSION_DATE` (beco
   booking (each moves to `OFFICIAL_FLOW_OPENED`), or a single tab when none are READY. At most
   once a minute. The monitor must already be running before opening time and see the session
   not yet accepting; it reacts to the change, not to a session that is already open.
-- Invalid data never replaces the last valid state; the dashboard marks it `LAST KNOWN`.
+- Each validated `live.json` response also refreshes the in-memory READY-order queue and prints changed per-booking assessments from that same response (no duplicate availability request). This runs as part of `monitor`; no checkout is automated.\n- Invalid data never replaces the last valid state; the dashboard marks it `LAST KNOWN`.
 - Stock and slot history is written only when a value changes.
 - The terminal bell rings for alerts: session opening/closing, target product stock changes,
   a slot reopening, and the endpoint becoming unavailable. Disable with `--no-bell` or
