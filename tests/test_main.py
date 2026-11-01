@@ -81,3 +81,14 @@ def test_orders_evaluate_is_available_in_cli_help(capsys: pytest.CaptureFixture[
 
     assert exc_info.value.code == 0
     assert "--open-next" in capsys.readouterr().out
+
+
+
+def test_bookings_workflow_is_available_in_cli_help(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["bookings", "workflow", "--help"])
+
+    assert exc_info.value.code == 0
+    assert "--all" in capsys.readouterr().out
