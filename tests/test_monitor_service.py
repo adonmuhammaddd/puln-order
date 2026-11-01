@@ -290,7 +290,9 @@ def test_live_callback_receives_only_validated_snapshots(
     service.poll_once()
 
     assert len(received) == 1
-    assert received[0].status.product(100).stock_remaining == 2
+    product = received[0].status.product(100)
+    assert product is not None
+    assert product.stock_remaining == 2
 
 
 def test_live_callback_failure_does_not_break_monitoring(
