@@ -68,9 +68,7 @@ def run_evaluate(runtime: Runtime, *, open_next: bool = False) -> int:
     if not open_next:
         return 0
 
-    candidate = next(
-        (r for r in results if r.outcome is ExecutionOutcome.READY_FOR_OPERATOR), None
-    )
+    candidate = next((r for r in results if r.outcome is ExecutionOutcome.READY_FOR_OPERATOR), None)
     if candidate is None:
         console.print("No booking is currently eligible for operator handoff.", style="yellow")
         return 1
@@ -99,8 +97,7 @@ def run_evaluate(runtime: Runtime, *, open_next: bool = False) -> int:
         markup=False,
     )
     console.print(
-        f"After completing the official flow, record it with: "
-        f"bookings mark {booking.id} submitted",
+        f"After completing the official flow, record it with: bookings mark {booking.id} submitted",
         markup=False,
     )
     return 0
