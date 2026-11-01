@@ -215,7 +215,8 @@ class PulnClient:
         """Fetch and parse the public session HTML; this method never submits a form."""
         response, _duration_ms = self._get(url, "text/html")
         if isinstance(response, httpx.HTTPError):
-            raise RuntimeError(f"catalogue request failed ({_classify_network_error(response)} error)")
+            kind = _classify_network_error(response)
+            raise RuntimeError(f"catalogue request failed ({kind} error)")
         if response.status_code != 200:
             raise RuntimeError(f"catalogue request returned HTTP {response.status_code}")
         content_type = response.headers.get("content-type", "").lower()
