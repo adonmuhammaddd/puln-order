@@ -335,32 +335,40 @@ def run_products_sync(runtime: Runtime) -> int:
 
 
 def run_products_list(runtime: Runtime) -> int:
-    targets = frozenset(runtime.settings.target_product_ids)
-    with runtime.session_factory() as db:
-        product_repository.seed_known_products(db)
-        product_repository.sync_targets(db, targets)
-        db.commit()
-        products = product_repository.list_products(db)
-    table = Table(title="PRODUCT CATALOGUE", title_justify="left")
-    table.add_column("ID", justify="right")
-    table.add_column("NAME")
-    table.add_column("MAX QTY", justify="right")
-    table.add_column("TARGET")
-    for product in products:
+    session = resolve_or_report(runtime)
+    session_products = []
+    if session is not None:
+        with runtime.session_factory() as db:
+            session_products = session_product_repository.list_for_session(db, session.slug)
+    table = Table(title="SESSION PRODUCT CATALOGUE", title_justify="left")
+    for column in ("ID", "VARIANT", "NAME", "MAX QTY", "PRICE"):
+        table.add_column(column)
+    for product in session_products:
         table.add_row(
             str(product.puln_product_id),
+            product.variant_key,
             product.name,
-            "-" if product.max_quantity is None else str(product.max_quantity),
-            "yes" if product.is_target else "",
+            "unknown" if product.max_quantity is None else str(product.max_quantity),
+            "-" if product.price is None else f"Rp {product.price}",
         )
     runtime.console.print(table)
-    missing = sorted(targets - {p.puln_product_id for p in products})
-    if missing:
-        runtime.console.print(
-            f"Target IDs without a name: {', '.join(map(str, missing))}", markup=False
-        )
+    if not session_products:
+        runtime.console.print("No session catalogue. Run: products sync", style="yellow")
+    with runtime.session_factory() as db:
+        legacy = product_repository.list_products(db)
+    if legacy:
+        legacy_table = Table(title="LEGACY / MANUAL CATALOGUE", title_justify="left")
+        legacy_table.add_column("ID", justify="right")
+        legacy_table.add_column("NAME")
+        legacy_table.add_column("MAX QTY", justify="right")
+        for product in legacy:
+            legacy_table.add_row(
+                str(product.puln_product_id),
+                product.name,
+                "-" if product.max_quantity is None else str(product.max_quantity),
+            )
+        runtime.console.print(legacy_table)
     return 0
-
 
 def run_products_name(runtime: Runtime, product_id: int, name: str) -> int:
     with runtime.session_factory() as db:
