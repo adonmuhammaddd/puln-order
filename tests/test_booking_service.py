@@ -45,6 +45,8 @@ def session_factory() -> sessionmaker[Session]:
     factory = create_session_factory(init_db("sqlite://"))
     with factory() as db:
         product_repository.seed_known_products(db)
+        product_repository.set_product_name(db, 100, "Kataifi Rolls")
+        product_repository.set_max_quantity(db, 100, 1)
         product_repository.set_product_name(db, 102, "Example Product")
         snapshot_repository.record_live_state(db, SLUG, SAMPLE, OBSERVED)
         db.commit()
