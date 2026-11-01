@@ -77,3 +77,12 @@ def list_for_session(session: Session, session_slug: str) -> Sequence[SessionPro
         )
         .order_by(SessionProduct.puln_product_id)
     ).all()
+
+
+def list_all_for_session(session: Session, session_slug: str) -> Sequence[SessionProduct]:
+    """Include inactive rows for historical booking labels."""
+    return session.scalars(
+        select(SessionProduct)
+        .where(SessionProduct.session_slug == session_slug)
+        .order_by(SessionProduct.puln_product_id)
+    ).all()
