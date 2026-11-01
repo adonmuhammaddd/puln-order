@@ -100,6 +100,7 @@ uv run python -m app.main customers delete 1 --anonymize   # keep booking histor
 uv run python -m app.main products limit 100 1        # per-person limit seen on the official page
 uv run python -m app.main bookings prepare            # interactive; shows last-known availability
 uv run python -m app.main bookings list [--all]
+uv run python -m app.main bookings workflow [--all]  # status + next operator action
 uv run python -m app.main bookings show 1             # details + status history
 uv run python -m app.main bookings open 1             # opens the official page in your browser
 uv run python -m app.main bookings open --all-ready   # one tab per READY booking, in ID order
@@ -128,6 +129,21 @@ are final. `READY` and `OFFICIAL_FLOW_OPENED` can step back for corrections.
 - Quantity is checked against the local limit (`products limit`). Stock and slot capacity are
   last-known values and only produce warnings.
 - Every status change is kept in the booking history.
+
+### Booking workflow coordinator
+
+See the whole operator pipeline in one place:
+
+```bash
+uv run python -m app.main bookings workflow
+uv run python -m app.main bookings workflow --all
+```
+
+The view is read-only. It lists bookings in FIFO order (oldest booking ID first), reads the
+current status from the database, and gives the next suggested operator action. It does not
+advance statuses, open pages, submit orders, or infer a successful reservation. Use
+`bookings show <id>` for the full audit history and `bookings mark` / `bookings confirm`
+to record actions after they actually happen.
 
 ### Reviewing a result page
 
