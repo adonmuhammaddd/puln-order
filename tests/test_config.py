@@ -15,7 +15,7 @@ def test_defaults_are_conservative() -> None:
     assert settings.puln_poll_interval_seconds == 10
     assert settings.puln_max_poll_interval_seconds == 60
     assert settings.puln_request_timeout_seconds == 10
-    assert settings.target_product_ids == [100]
+    assert settings.target_product_ids == []
     assert settings.max_customers == 10
     assert settings.puln_session_date is None
     assert settings.puln_session_slug is None
