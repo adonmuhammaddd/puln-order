@@ -35,6 +35,15 @@ def _add_monitoring(groups: Groups) -> None:
     groups.add_parser("status", help="Refresh once and print the dashboard")
     sessions = _actions(groups, "sessions", "Session checks")
     sessions.add_parser("validate", help="Check the session page and live endpoint once")
+    orders = _actions(groups, "orders", "Read-only order availability and operator handoff")
+    evaluate = orders.add_parser(
+        "evaluate", help="Assess READY bookings against fresh live availability"
+    )
+    evaluate.add_argument(
+        "--open-next",
+        action="store_true",
+        help="Open the official page for the first eligible booking (manual checkout only)",
+    )
 
 
 def _add_products(groups: Groups) -> None:
