@@ -58,6 +58,8 @@ def _dispatch_bookings(args: argparse.Namespace, runtime: commands.Runtime) -> i
     match args.action:
         case "list":
             return booking_commands.run_list(runtime, all_sessions=args.all)
+        case "workflow":
+            return booking_commands.run_workflow(runtime, all_sessions=args.all)
         case "prepare":
             return booking_commands.run_prepare(runtime)
         case "show":
