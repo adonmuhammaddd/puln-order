@@ -3,6 +3,24 @@
 The orchestrator coordinates local READY bookings and read-only PULN availability. It does not
 reserve stock, submit a form, or interact with Turnstile.
 
+## CLI integration
+
+Assess all READY bookings for the configured session:
+
+```bash
+uv run python -m app.main orders evaluate
+```
+
+Assess availability and open the official PULN page for only the first eligible booking:
+
+```bash
+uv run python -m app.main orders evaluate --open-next
+```
+
+The second command transitions that booking from READY to OFFICIAL_FLOW_OPENED only after the
+browser opener reports success. It does not fill or submit the form. The operator completes the
+official flow and any security challenge directly in the browser.
+
 ## Responsibilities
 
 - Rebuild an in-memory FIFO queue from READY bookings in the configured session.
