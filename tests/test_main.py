@@ -83,7 +83,6 @@ def test_orders_evaluate_is_available_in_cli_help(capsys: pytest.CaptureFixture[
     assert "--open-next" in capsys.readouterr().out
 
 
-
 def test_bookings_workflow_is_available_in_cli_help(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
