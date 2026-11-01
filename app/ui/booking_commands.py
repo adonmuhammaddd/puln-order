@@ -166,14 +166,17 @@ def run_list(runtime: Runtime, *, all_sessions: bool) -> int:
     return _guarded(runtime, action)
 
 
-
 WORKFLOW_NEXT: dict[BookingStatus, str] = {
     BookingStatus.DRAFT: "Review details; mark ready when prepared",
     BookingStatus.READY: "Run orders evaluate, then open the official page",
-    BookingStatus.OFFICIAL_FLOW_OPENED: "Complete the official form yourself; then mark submitted",
+    BookingStatus.OFFICIAL_FLOW_OPENED: (
+        "Complete the official form yourself; then mark submitted"
+    ),
     BookingStatus.SUBMITTED_BY_USER: "Review the saved result page, or mark awaiting-email",
     BookingStatus.SUCCESS_PAGE_REVIEWED: "Mark awaiting-email and wait for the email",
-    BookingStatus.AWAITING_EMAIL: "Verify the official confirmation email, then run bookings confirm",
+    BookingStatus.AWAITING_EMAIL: (
+        "Verify the official confirmation email, then run bookings confirm"
+    ),
     BookingStatus.CONFIRMED: "Complete",
     BookingStatus.FAILED: "Terminal — investigate before preparing a new booking",
     BookingStatus.CANCELLED: "Terminal — no further action",
@@ -215,6 +218,7 @@ def run_workflow(runtime: Runtime, *, all_sessions: bool) -> int:
         return 0
 
     return _guarded(runtime, action)
+
 
 def _describe(runtime: Runtime, booking: Booking) -> list[tuple[str, str]]:
     with runtime.session_factory() as db:
