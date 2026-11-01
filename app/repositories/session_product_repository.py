@@ -71,6 +71,9 @@ def get_by_id(session: Session, session_slug: str, product_id: int) -> SessionPr
 def list_for_session(session: Session, session_slug: str) -> Sequence[SessionProduct]:
     return session.scalars(
         select(SessionProduct)
-        .where(SessionProduct.session_slug == session_slug)
+        .where(
+            SessionProduct.session_slug == session_slug,
+            SessionProduct.is_active.is_(True),
+        )
         .order_by(SessionProduct.puln_product_id)
     ).all()
