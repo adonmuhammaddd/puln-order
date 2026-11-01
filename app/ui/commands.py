@@ -82,6 +82,14 @@ def _dashboard_context(runtime: Runtime, target_ids: frozenset[int]) -> Dashboar
     )
 
 
+def _session_target_ids(runtime: Runtime, session_slug: str) -> frozenset[int]:
+    with runtime.session_factory() as db:
+        mapped = session_product_repository.list_for_session(db, session_slug)
+    if mapped:
+        return frozenset(p.puln_product_id for p in mapped if p.variant_key == "kataifi-rolls")
+    return frozenset(runtime.settings.target_product_ids)
+
+
 def _monitor_service(
     runtime: Runtime,
     session: SessionRef,
@@ -138,7 +146,7 @@ def _monitor_service(
         client=PulnClient(http),
         session_factory=runtime.session_factory,
         session=session,
-        target_ids=frozenset(settings.target_product_ids),
+        target_ids=_session_target_ids(runtime, session.slug),
         timing=PollTiming(
             interval=settings.puln_poll_interval_seconds,
             max_interval=settings.puln_max_poll_interval_seconds,
@@ -213,7 +221,7 @@ def run_monitor_command(
             BookingService(runtime.session_factory, session_slug=session.slug),
             session.page_url,
             runtime.open_url,
-            target_ids=frozenset(settings.target_product_ids),
+            target_ids=_session_target_ids(runtime, session.slug),
             clock=utc_now,
         )
         if auto_open
