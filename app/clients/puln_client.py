@@ -17,6 +17,7 @@ import httpx
 from app.clock import utc_now
 from app.constants import USER_AGENT
 from app.models.puln import LivePayloadError, LiveStatus, parse_live_status, unknown_fields
+from app.models.catalogue import CatalogueProduct, parse_catalogue
 
 logger = logging.getLogger(__name__)
 
@@ -209,6 +210,23 @@ class PulnClient:
         except LivePayloadError as error:
             return InvalidPayload(200, duration_ms, str(error))
         return LiveOk(200, duration_ms, status, frozenset(unknown_fields(status)))
+
+    def fetch_catalogue(self, url: str) -> tuple[CatalogueProduct, ...]:
+        """Fetch and parse the public session HTML; this method never submits a form."""
+        response, _duration_ms = self._get(url, "text/html")
+        if isinstance(response, httpx.HTTPError):
+            raise RuntimeError(f"catalogue request failed ({_classify_network_error(response)} error)")
+        if response.status_code != 200:
+            raise RuntimeError(f"catalogue request returned HTTP {response.status_code}")
+        content_type = response.headers.get("content-type", "").lower()
+        if "html" not in content_type:
+            raise RuntimeError("catalogue response was not HTML")
+        if len(response.content) > MAX_BODY_BYTES:
+            raise RuntimeError("catalogue response body too large")
+        products = parse_catalogue(response.content)
+        if not products:
+            raise RuntimeError("no product cards found in the session HTML")
+        return products
 
     def check_page(self, url: str) -> PageCheck:
         """Confirm the official session page exists. The page body is not parsed or stored."""
