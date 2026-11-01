@@ -12,6 +12,6 @@ LIVE_ENDPOINT_SUFFIX = "/live.json"
 # Honest, identifiable client name. Never imitate a browser.
 USER_AGENT = f"PULN-Order-Assistant/{APP_VERSION} (personal monitoring tool)"
 
-# Products observed on the official page: (name, observed max quantity per person).
-# Seeded only when missing; recheck against the current page for each session.
+# Optional legacy seed catalogue. Session-specific products are parsed from official HTML.
+# Never put daily PULN product IDs here.
 KNOWN_PRODUCTS: dict[int, tuple[str, int | None]] = {}
