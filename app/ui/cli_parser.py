@@ -84,7 +84,9 @@ def _add_customers(groups: Groups) -> None:
 def _add_bookings(groups: Groups) -> None:
     bookings = _actions(groups, "bookings", "Reservation preparation and tracking")
     listing = bookings.add_parser("list", help="Bookings for the configured session")
-    workflow = bookings.add_parser("workflow", help="Show each booking status and its next operator action")
+    workflow = bookings.add_parser(
+        "workflow", help="Show each booking status and its next operator action"
+    )
     workflow.add_argument("--all", action="store_true", help="Include every session")
     listing.add_argument("--all", action="store_true", help="Include every session")
     bookings.add_parser("prepare", help="Prepare a booking for a customer (interactive)")
