@@ -19,7 +19,7 @@ from app.clients.puln_client import LiveOk, PulnClient, create_http_client
 from app.clock import utc_now
 from app.config import Settings
 from app.database.engine import sqlite_file_path
-from app.repositories import booking_repository, customer_repository, product_repository
+from app.repositories import booking_repository, customer_repository, product_repository, session_product_repository
 from app.services.booking_service import BookingService
 from app.services.browser_service import AutoOpener, OpenOutcome
 from app.services.monitor_service import MonitorService, MonitorState, run_monitor
@@ -291,6 +291,39 @@ def run_sessions_validate(runtime: Runtime) -> int:
         suffix = f": {detail}" if detail else ""
         console.print(f"  FAILED: {describe_result(live)}{suffix}", markup=False, soft_wrap=True)
     return 0 if page.reachable and isinstance(live, LiveOk) else 1
+
+
+def run_products_sync(runtime: Runtime) -> int:
+    """Read the current session's official HTML catalogue into a session-scoped map."""
+    session = resolve_or_report(runtime)
+    if session is None:
+        return 2
+    try:
+        with runtime.http_client() as http:
+            products = PulnClient(http).fetch_catalogue(session.page_url)
+        with runtime.session_factory() as db:
+            session_product_repository.upsert_catalogue(db, session.slug, products)
+            db.commit()
+    except (RuntimeError, ValueError) as error:
+        runtime.error_console.print(f"Catalogue sync failed: {error}", markup=False)
+        return 1
+    table = Table(title=f"SESSION CATALOGUE ({session.slug})", title_justify="left")
+    for column in ("ID", "VARIANT", "NAME", "PRICE", "STOCK", "MAX QTY"):
+        table.add_column(column)
+    for product in products:
+        table.add_row(str(product.puln_product_id), product.variant_key, product.name,
+            "-" if product.price is None else f"Rp {product.price:,.0f}",
+            "-" if product.stock_remaining is None else str(product.stock_remaining),
+            "unknown" if product.max_quantity is None else str(product.max_quantity))
+    runtime.console.print(table)
+    target = next((p for p in products if p.variant_key == "kataifi-rolls"), None)
+    if target is None:
+        runtime.error_console.print("Target variant kataifi-rolls was not found in this session.", markup=False)
+        return 1
+    runtime.console.print(
+        f"Target resolved: Kataifi Rolls -> {target.name} (Product ID {target.puln_product_id})",
+        markup=False)
+    return 0
 
 
 def run_products_list(runtime: Runtime) -> int:
