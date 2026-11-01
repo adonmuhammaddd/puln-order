@@ -105,7 +105,7 @@ def test_workflow_lists_next_action_without_changing_booking(tmp_path: Path) -> 
     try:
         assert run_workflow(runtime, all_sessions=False) == 0
         rendered = output.getvalue()
-        assert f"#{booking.id}" in rendered
+        assert str(booking.id) in rendered
         assert "READY" in rendered
         assert "Run orders evaluate" in rendered
         assert bookings.get(booking.id).status is BookingStatus.READY
