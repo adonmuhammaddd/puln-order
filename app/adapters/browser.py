@@ -10,6 +10,9 @@ Install the optional dependency with ``uv sync --extra browser`` and then
 
 from dataclasses import dataclass
 from enum import StrEnum
+from importlib import import_module
+from types import TracebackType
+from typing import Any
 from urllib.parse import urlsplit
 
 
@@ -46,13 +49,16 @@ def validate_official_url(url: str) -> str:
 def classify_visible_page(text: str) -> BrowserStage:
     """Classify visible page copy without extracting form values or challenge tokens."""
     content = " ".join(text.casefold().split())
-    if any(term in content for term in ("verify you are human", "checking your browser", "just a moment")):
+    challenge_terms = ("verify you are human", "checking your browser", "just a moment")
+    if any(term in content for term in challenge_terms):
         return BrowserStage.CHALLENGE
     if "reservasi berhasil" in content:
         return BrowserStage.SUCCESS_PAGE
     if any(term in content for term in ("reservasi gagal", "reservation failed")):
         return BrowserStage.FAILURE_PAGE
-    if "reservasi" in content and any(term in content for term in ("nama", "whatsapp", "email")):
+    if "reservasi" in content and any(
+        term in content for term in ("nama", "whatsapp", "email")
+    ):
         return BrowserStage.RESERVATION_FORM
     return BrowserStage.UNKNOWN
 
@@ -61,15 +67,14 @@ class PlaywrightBrowserAdapter:
     """Manage one ephemeral, visible Playwright browser session for operator assistance."""
 
     def __init__(self) -> None:
-        self._playwright = None
-        self._browser = None
-        self._context = None
-        self._page = None
+        self._playwright: Any | None = None
+        self._browser: Any | None = None
+        self._context: Any | None = None
+        self._page: Any | None = None
 
     async def __aenter__(self) -> "PlaywrightBrowserAdapter":
         try:
-            from playwright.async_api import async_playwright
-
+            async_playwright = import_module("playwright.async_api").async_playwright
             self._playwright = await async_playwright().start()
             self._browser = await self._playwright.chromium.launch(headless=False)
             # A fresh, non-persistent context: no saved profile, cookies, or local storage.
@@ -117,5 +122,10 @@ class PlaywrightBrowserAdapter:
             self._playwright = None
         self._page = None
 
-    async def __aexit__(self, exc_type, exc, traceback) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         await self.close()
