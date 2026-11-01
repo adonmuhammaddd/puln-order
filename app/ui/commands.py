@@ -14,6 +14,7 @@ from rich.table import Table
 from sqlalchemy import Engine, inspect
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.adapters.backend import PulnReadOnlyBackendAdapter
 from app.clients.puln_client import LiveOk, PulnClient, create_http_client
 from app.clock import utc_now
 from app.config import Settings
@@ -23,6 +24,7 @@ from app.services.booking_service import BookingService
 from app.services.browser_service import AutoOpener, OpenOutcome
 from app.services.monitor_service import MonitorService, MonitorState, run_monitor
 from app.services.notification_service import Notifier
+from app.services.order_orchestrator import OrderOrchestrator
 from app.services.poll_policy import PollTiming
 from app.services.session_service import SessionConfigError, SessionRef, resolve_session
 from app.services.stock_monitor import ChangeEvent, describe_result
@@ -88,8 +90,43 @@ def _monitor_service(
     keep_running: bool,
     notifier: Notifier | None,
     auto_opener: AutoOpener | None = None,
+    track_orders: bool = False,
 ) -> MonitorService:
     settings = runtime.settings
+
+    previous_outcomes: dict[int, str] = {}
+    orchestrator = (
+        OrderOrchestrator(
+            session=session,
+            backend=PulnReadOnlyBackendAdapter(PulnClient(http)),
+            bookings=BookingService(runtime.session_factory, session_slug=session.slug),
+        )
+        if track_orders
+        else None
+    )
+
+    def on_live(result: LiveOk) -> None:
+        if orchestrator is None:
+            return
+        refresh = orchestrator.enqueue_ready_bookings()
+        if refresh.rejected_ids:
+            runtime.console.print(
+                f"Order queue full; not queued: {', '.join(map(str, refresh.rejected_ids))}",
+                style="yellow",
+                markup=False,
+            )
+        for item in orchestrator.evaluate_live_status(result.status):
+            outcome = item.outcome.value
+            if previous_outcomes.get(item.booking_id) == outcome:
+                continue
+            previous_outcomes[item.booking_id] = outcome
+            style = "bold green" if outcome == "READY_FOR_OPERATOR" else "yellow"
+            runtime.console.print(
+                f"Booking #{item.booking_id}: {outcome} — {item.detail}",
+                style=style,
+                markup=False,
+                soft_wrap=True,
+            )
 
     def on_event(event: ChangeEvent) -> None:
         if notifier is not None:
@@ -110,6 +147,7 @@ def _monitor_service(
         clock=utc_now,
         rng=random.Random(),
         on_event=on_event,
+        on_live=on_live if track_orders else None,
     )
 
 
@@ -189,6 +227,7 @@ def run_monitor_command(
             keep_running=keep_running,
             notifier=notifier,
             auto_opener=auto_opener,
+            track_orders=True,
         )
         service.load_cached()
         ctx = _dashboard_context(runtime, service.target_ids)
