@@ -73,3 +73,11 @@ def test_module_entry_point_runs(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert "PULN Order Assistant" in result.stdout
+
+
+def test_orders_evaluate_is_available_in_cli_help(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        main(["orders", "evaluate", "--help"])
+
+    assert exc_info.value.code == 0
+    assert "--open-next" in capsys.readouterr().out
