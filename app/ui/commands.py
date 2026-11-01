@@ -19,7 +19,12 @@ from app.clients.puln_client import LiveOk, PulnClient, create_http_client
 from app.clock import utc_now
 from app.config import Settings
 from app.database.engine import sqlite_file_path
-from app.repositories import booking_repository, customer_repository, product_repository, session_product_repository
+from app.repositories import (
+    booking_repository,
+    customer_repository,
+    product_repository,
+    session_product_repository,
+)
 from app.services.booking_service import BookingService
 from app.services.browser_service import AutoOpener, OpenOutcome
 from app.services.monitor_service import MonitorService, MonitorState, run_monitor
