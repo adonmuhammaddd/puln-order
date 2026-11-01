@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Enum, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Enum, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.clock import utc_now
@@ -158,4 +158,5 @@ class SessionProduct(Base):
     price: Mapped[str | None] = mapped_column(String(40))
     stock_remaining: Mapped[int | None]
     max_quantity: Mapped[int | None]
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
