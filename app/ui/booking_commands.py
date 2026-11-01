@@ -16,7 +16,7 @@ from app.parsers.reservation_response_parser import (
     parse_reservation_response,
     read_response_file,
 )
-from app.repositories import customer_repository, product_repository, snapshot_repository
+from app.repositories import customer_repository, product_repository, session_product_repository, snapshot_repository
 from app.services.booking_service import BookingError, BookingService, PreparationRequest
 from app.services.browser_service import open_ready_bookings
 from app.services.session_service import resolve_session
@@ -79,6 +79,7 @@ def _print_choices(runtime: Runtime, slug: str) -> None:
         db.commit()
         customers = customer_repository.list_customers(db, active_only=True)
         products = product_repository.list_products(db)
+        session_products = session_product_repository.list_for_session(db, slug)
         cached = snapshot_repository.load_last_state(db, slug)
     console.print("Active customers:", style="bold")
     for customer in customers:
@@ -102,7 +103,7 @@ def run_prepare(runtime: Runtime) -> int:
     def action(service: BookingService) -> int:
         console = runtime.console
         _print_choices(runtime, service.session_slug)
-        default_product = runtime.settings.target_product_ids[0]
+        with runtime.session_factory() as db:\n            session_products = session_product_repository.list_for_session(db, service.session_slug)\n        target_product = next((p for p in session_products if p.variant_key == "kataifi-rolls"), None)\n        if target_product is None:\n            console.print("Target product is not mapped for this session. Run: products sync", style="yellow")\n            return 1\n        default_product = target_product.puln_product_id
         customer_id = ask_valid(console, "Customer ID", _whole_number)
         product_id = ask_valid(
             console, f"Product ID [{default_product}]", _whole_number, keep_blank=True
