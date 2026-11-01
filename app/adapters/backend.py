@@ -7,8 +7,7 @@ not be added until PULN documents or explicitly authorises an integration contra
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.clients.puln_client import FetchResult, PageCheck, PulnClient
-from app.models.puln import LiveOk
+from app.clients.puln_client import FetchResult, LiveOk, PageCheck, PulnClient
 from app.services.session_service import SessionRef
 
 
