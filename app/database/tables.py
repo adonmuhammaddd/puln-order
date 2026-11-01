@@ -139,3 +139,23 @@ class BookingStatusChange(Base):
     )
     note: Mapped[str | None] = mapped_column(Text)
     changed_at: Mapped[datetime]
+
+
+class SessionProduct(Base):
+    """A product variant's ID and constraints within one dated PULN session."""
+
+    __tablename__ = "session_products"
+    __table_args__ = (
+        UniqueConstraint("session_slug", "puln_product_id"),
+        UniqueConstraint("session_slug", "variant_key"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_slug: Mapped[str] = mapped_column(String(80))
+    puln_product_id: Mapped[int]
+    variant_key: Mapped[str] = mapped_column(String(100))
+    name: Mapped[str] = mapped_column(String(160))
+    price: Mapped[str | None] = mapped_column(String(40))
+    stock_remaining: Mapped[int | None]
+    max_quantity: Mapped[int | None]
+    updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
