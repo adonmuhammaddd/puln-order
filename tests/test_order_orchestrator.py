@@ -104,7 +104,7 @@ def make_orchestrator(
     )
     return OrderOrchestrator(
         session=SESSION,
-        backend=adapter,  # type: ignore[arg-type]
+        backend=adapter,
         bookings=booking_service,
         queue=queue,
     )
