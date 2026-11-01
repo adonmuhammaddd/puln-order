@@ -80,7 +80,13 @@ def make_live(*, accepting: bool = True, stock: int = 5, slot_remaining: int = 5
     return LiveOk(200, 10, status, frozenset())
 
 
-def make_orchestrator(\n    booking_service: BookingService,\n    live: object | None = None,\n    *,\n    reachable: bool = True,\n    queue: OrderQueue | None = None,\n) -> OrderOrchestrator:
+def make_orchestrator(
+    booking_service: BookingService,
+    live: object | None = None,
+    *,
+    reachable: bool = True,
+    queue: OrderQueue | None = None,
+) -> OrderOrchestrator:
     adapter = SimpleNamespace(
         inspect=lambda session: SimpleNamespace(
             page=PageCheck(reachable, 200 if reachable else 503, "session page found" if reachable else "HTTP 503"),
@@ -95,7 +101,9 @@ def make_orchestrator(\n    booking_service: BookingService,\n    live: object |
     )
 
 
-def test_enqueue_only_ready_bookings_and_is_idempotent(\n    booking_service: BookingService, customer_id: int\n) -> None:
+def test_enqueue_only_ready_bookings_and_is_idempotent(
+    booking_service: BookingService, customer_id: int
+) -> None:
     first = prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service)
 
@@ -125,7 +133,9 @@ def test_orchestrator_rejects_mismatched_session(booking_service: BookingService
         OrderOrchestrator(session=other, backend=object(), bookings=booking_service)  # type: ignore[arg-type]
 
 
-def test_evaluate_marks_available_booking_ready_for_operator(\n    booking_service: BookingService, customer_id: int\n) -> None:
+def test_evaluate_marks_available_booking_ready_for_operator(
+    booking_service: BookingService, customer_id: int
+) -> None:
     booking = prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service)
     orchestrator.enqueue_ready_bookings()
@@ -138,7 +148,9 @@ def test_evaluate_marks_available_booking_ready_for_operator(\n    booking_servi
     assert booking_service.get(booking.id).status is BookingStatus.READY
 
 
-def test_evaluate_waits_when_session_not_accepting(\n    booking_service: BookingService, customer_id: int\n) -> None:
+def test_evaluate_waits_when_session_not_accepting(
+    booking_service: BookingService, customer_id: int
+) -> None:
     prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service, make_live(accepting=False))
     orchestrator.enqueue_ready_bookings()
@@ -146,7 +158,9 @@ def test_evaluate_waits_when_session_not_accepting(\n    booking_service: Bookin
     assert orchestrator.evaluate_queue()[0].outcome is ExecutionOutcome.WAITING_FOR_OPENING
 
 
-def test_evaluate_does_not_claim_stock_when_empty(\n    booking_service: BookingService, customer_id: int\n) -> None:
+def test_evaluate_does_not_claim_stock_when_empty(
+    booking_service: BookingService, customer_id: int
+) -> None:
     prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service, make_live(stock=0))
     orchestrator.enqueue_ready_bookings()
@@ -154,7 +168,9 @@ def test_evaluate_does_not_claim_stock_when_empty(\n    booking_service: Booking
     assert orchestrator.evaluate_queue()[0].outcome is ExecutionOutcome.OUT_OF_STOCK
 
 
-def test_evaluate_blocks_when_slot_is_full(\n    booking_service: BookingService, customer_id: int\n) -> None:
+def test_evaluate_blocks_when_slot_is_full(
+    booking_service: BookingService, customer_id: int
+) -> None:
     prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service, make_live(slot_remaining=0))
     orchestrator.enqueue_ready_bookings()
@@ -162,7 +178,9 @@ def test_evaluate_blocks_when_slot_is_full(\n    booking_service: BookingService
     assert orchestrator.evaluate_queue()[0].outcome is ExecutionOutcome.SLOT_FULL
 
 
-def test_evaluate_blocks_when_session_page_is_unavailable(\n    booking_service: BookingService, customer_id: int\n) -> None:
+def test_evaluate_blocks_when_session_page_is_unavailable(
+    booking_service: BookingService, customer_id: int
+) -> None:
     prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service, reachable=False)
     orchestrator.enqueue_ready_bookings()
@@ -170,7 +188,9 @@ def test_evaluate_blocks_when_session_page_is_unavailable(\n    booking_service:
     assert orchestrator.evaluate_queue()[0].outcome is ExecutionOutcome.SESSION_UNAVAILABLE
 
 
-def test_evaluate_blocks_untrusted_live_payload(\n    booking_service: BookingService, customer_id: int\n) -> None:
+def test_evaluate_blocks_untrusted_live_payload(
+    booking_service: BookingService, customer_id: int
+) -> None:
     prepare(booking_service, customer_id)
     bad_live = SimpleNamespace(outcome="invalid")
     orchestrator = make_orchestrator(booking_service, bad_live)
@@ -179,7 +199,9 @@ def test_evaluate_blocks_untrusted_live_payload(\n    booking_service: BookingSe
     assert orchestrator.evaluate_queue()[0].outcome is ExecutionOutcome.LIVE_DATA_UNAVAILABLE
 
 
-def test_stale_queue_booking_is_not_marked_ready(\n    booking_service: BookingService, customer_id: int\n) -> None:
+def test_stale_queue_booking_is_not_marked_ready(
+    booking_service: BookingService, customer_id: int
+) -> None:
     booking = prepare(booking_service, customer_id)
     orchestrator = make_orchestrator(booking_service)
     orchestrator.enqueue_ready_bookings()
