@@ -84,7 +84,13 @@ def _print_choices(runtime: Runtime, slug: str) -> None:
     console.print("Active customers:", style="bold")
     for customer in customers:
         console.print(f"  {customer.id}  {customer.display_name}", markup=False)
-    console.print("Products:", style="bold")
+    console.print("Products (active session):", style="bold")
+    for product in session_products:
+        limit = "limit unknown" if product.max_quantity is None else f"max {product.max_quantity}"
+        console.print(f"  {product.puln_product_id}  {product.name}, {limit} [{product.variant_key}]", markup=False)
+    if not session_products:
+        console.print("  No session catalogue yet; run products sync.", style="yellow")
+    console.print("Legacy products:", style="bold")
     for product in products:
         limit = "no local limit" if product.max_quantity is None else f"max {product.max_quantity}"
         marker = " (target)" if product.puln_product_id in targets else ""
@@ -103,7 +109,13 @@ def run_prepare(runtime: Runtime) -> int:
     def action(service: BookingService) -> int:
         console = runtime.console
         _print_choices(runtime, service.session_slug)
-        with runtime.session_factory() as db:\n            session_products = session_product_repository.list_for_session(db, service.session_slug)\n        target_product = next((p for p in session_products if p.variant_key == "kataifi-rolls"), None)\n        if target_product is None:\n            console.print("Target product is not mapped for this session. Run: products sync", style="yellow")\n            return 1\n        default_product = target_product.puln_product_id
+        with runtime.session_factory() as db:
+            session_products = session_product_repository.list_for_session(db, service.session_slug)
+        target_product = next((p for p in session_products if p.variant_key == "kataifi-rolls"), None)
+        if target_product is None:
+            console.print("Target product is not mapped for this session. Run: products sync", style="yellow")
+            return 1
+        default_product = target_product.puln_product_id
         customer_id = ask_valid(console, "Customer ID", _whole_number)
         product_id = ask_valid(
             console, f"Product ID [{default_product}]", _whole_number, keep_blank=True
