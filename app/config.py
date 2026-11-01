@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./data/puln_assistant.db"
 
-    target_product_ids: Annotated[list[int], NoDecode] = Field(default_factory=lambda: [100])
+    target_product_ids: Annotated[list[int], NoDecode] = Field(default_factory=list)
     max_customers: int = Field(default=10, ge=1, le=10)
 
     notify_bell: bool = True
