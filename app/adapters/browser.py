@@ -56,9 +56,7 @@ def classify_visible_page(text: str) -> BrowserStage:
         return BrowserStage.SUCCESS_PAGE
     if any(term in content for term in ("reservasi gagal", "reservation failed")):
         return BrowserStage.FAILURE_PAGE
-    if "reservasi" in content and any(
-        term in content for term in ("nama", "whatsapp", "email")
-    ):
+    if "reservasi" in content and any(term in content for term in ("nama", "whatsapp", "email")):
         return BrowserStage.RESERVATION_FORM
     return BrowserStage.UNKNOWN
 
