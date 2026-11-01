@@ -172,7 +172,7 @@ def run_list(runtime: Runtime, *, all_sessions: bool) -> int:
             names_by_session = {
                 booking.session_slug: {
                     p.puln_product_id: p.name
-                    for p in session_product_repository.list_for_session(db, booking.session_slug)
+                    for p in session_product_repository.list_all_for_session(db, booking.session_slug)
                 }
                 for booking in bookings
             }
