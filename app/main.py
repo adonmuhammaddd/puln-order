@@ -30,8 +30,7 @@ def _format_config_error(error: ValidationError) -> str:
     for item in error.errors():
         field = ".".join(str(part) for part in item["loc"]).upper() or "SETTINGS"
         lines.append(f"  {field}: {item['msg']}")
-    return "
-".join(lines)
+    return "\n".join(lines)
 
 
 def _dispatch_customers(args: argparse.Namespace, runtime: commands.Runtime) -> int:
