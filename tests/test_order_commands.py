@@ -50,9 +50,7 @@ def make_runtime(
         ready=True,
     )
 
-    payload = json.loads(
-        (Path(__file__).parent / "fixtures" / "live_sample.json").read_text()
-    )
+    payload = json.loads((Path(__file__).parent / "fixtures" / "live_sample.json").read_text())
     for product in payload["products"]:
         if product["id"] == 100:
             product["stock_remaining"] = 5
