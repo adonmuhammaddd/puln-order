@@ -28,7 +28,9 @@ def test_does_not_infer_limit_from_quantity_input_max() -> None:
         '<li class="product" data-product="106" data-name="Other" '
         'data-max-per=""><input max="0"></li>'
     )
-    assert parse_catalogue(html)[0].max_quantity is None
+    product = parse_catalogue(html)[0]
+    assert product.max_quantity is None
+    assert product.variant_key == "puln-product-106"
 
 
 def test_ignores_invalid_or_duplicate_product_ids() -> None:
