@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from app.adapters.backend import SessionBackendAdapter
 from app.clients.puln_client import LiveOk
 from app.models.booking import BookingStatus
+from app.models.puln import LiveStatus
 from app.models.execution_result import ExecutionOutcome, ExecutionResult
 from app.services.booking_service import BookingService
 from app.services.order_queue import OrderQueue, OrderQueueFullError
@@ -89,7 +90,13 @@ class OrderOrchestrator:
             detail = f"live status is not trustworthy ({type(inspection.live).__name__})"
             return tuple(ExecutionResult(booking_id, outcome, detail) for booking_id in booking_ids)
 
-        live = inspection.live.status
+        return self.evaluate_live_status(inspection.live.status)
+
+    def evaluate_live_status(self, live: LiveStatus) -> Sequence[ExecutionResult]:
+        """Assess the queue using an already-fetched validated status (no extra HTTP request)."""
+        booking_ids = self._queue.peek_all()
+        if not booking_ids:
+            return ()
         results: list[ExecutionResult] = []
         for booking_id in booking_ids:
             booking = self._bookings.get(booking_id)
@@ -168,3 +175,4 @@ class OrderOrchestrator:
                 )
             )
         return tuple(results)
+
