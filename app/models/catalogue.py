@@ -58,7 +58,7 @@ def parse_catalogue(html: bytes | str) -> tuple[CatalogueProduct, ...]:
         key = (
             "kataifi-rolls"
             if name.casefold() == "kataifi crunch (personal)"
-            else re.sub(r"[^a-z0-9]+", "-", name.casefold()).strip("-")
+            else f"puln-product-{product_id}"
         )
         price_node = item.select_one("[data-price]")
         stock_node = item.select_one("[data-stock]")
