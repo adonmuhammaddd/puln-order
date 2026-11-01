@@ -24,7 +24,10 @@ def test_parses_official_product_and_keeps_blank_limit_unknown() -> None:
 
 
 def test_does_not_infer_limit_from_quantity_input_max() -> None:
-    html = '<li class="product" data-product="106" data-name="Other" data-max-per=""><input max="0"></li>'
+    html = (
+        '<li class="product" data-product="106" data-name="Other" '
+        'data-max-per=""><input max="0"></li>'
+    )
     assert parse_catalogue(html)[0].max_quantity is None
 
 
