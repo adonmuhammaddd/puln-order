@@ -107,8 +107,11 @@ class BookingService:
             raise BookingValidationError(
                 f"customer {request.customer_id} is not active or has no recorded consent"
             )
-        product = session_product_repository.get_by_id(db, self._slug, request.product_id)
-        if product is None:
+        session_catalogue = session_product_repository.list_for_session(db, self._slug)
+        if session_catalogue:
+            product = session_product_repository.get_by_id(db, self._slug, request.product_id)
+        else:
+            # Compatibility for sessions that have not yet been synced.
             product = product_repository.get_product(db, request.product_id)
         if product is None:
             raise BookingValidationError(
