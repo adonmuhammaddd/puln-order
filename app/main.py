@@ -105,6 +105,12 @@ def _dispatch(args: argparse.Namespace, runtime: commands.Runtime) -> int:
                 sound=args.sound,
                 auto_open=args.auto_open,
             )
+        case "orders":
+            from app.ui import order_commands
+
+            if args.action == "evaluate":
+                return order_commands.run_evaluate(runtime, open_next=args.open_next)
+            raise AssertionError(f"unhandled orders action {args.action}")
         case "status":
             return commands.run_status(runtime)
         case "sessions":
