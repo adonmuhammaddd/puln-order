@@ -242,3 +242,23 @@ def test_check_page_reports_network_failure() -> None:
     assert page.reachable is False
     assert page.http_status is None
     assert "connect" in page.detail
+
+
+
+def test_fetch_catalogue_parses_product_cards() -> None:
+    html = b'<li class="product" data-product="105" data-name="Kataifi Crunch (Personal)" data-max-per=""><p data-price="70000.00"></p></li>'
+    result = make_client(respond(200, html, {"content-type": "text/html"})).fetch_catalogue(PAGE_URL)
+    assert len(result) == 1
+    assert result[0].puln_product_id == 105
+    assert result[0].variant_key == "kataifi-rolls"
+    assert result[0].max_quantity is None
+
+
+def test_fetch_catalogue_rejects_non_html_response() -> None:
+    with pytest.raises(RuntimeError, match="not HTML"):
+        make_client(respond(200, SAMPLE, JSON)).fetch_catalogue(PAGE_URL)
+
+
+def test_fetch_catalogue_rejects_empty_product_list() -> None:
+    with pytest.raises(RuntimeError, match="no product cards"):
+        make_client(respond(200, b"<html></html>", {"content-type": "text/html"})).fetch_catalogue(PAGE_URL)
