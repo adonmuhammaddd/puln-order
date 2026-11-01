@@ -17,6 +17,7 @@ from app.services.booking_service import BookingService, PreparationRequest
 from app.services.customer_service import CustomerService
 from app.ui.commands import Runtime
 from app.ui.order_commands import run_evaluate
+from app.ui.booking_commands import run_workflow
 
 SLUG = "online-order-20261031"
 
@@ -97,6 +98,19 @@ def test_evaluate_opens_only_first_eligible_booking(tmp_path: Path) -> None:
     finally:
         engine.dispose()
 
+
+
+def test_workflow_lists_next_action_without_changing_booking(tmp_path: Path) -> None:
+    runtime, bookings, booking, output, engine = make_runtime(tmp_path)
+    try:
+        assert run_workflow(runtime, all_sessions=False) == 0
+        rendered = output.getvalue()
+        assert f"#{booking.id}" in rendered
+        assert "READY" in rendered
+        assert "Run orders evaluate" in rendered
+        assert bookings.get(booking.id).status is BookingStatus.READY
+    finally:
+        engine.dispose()
 
 def test_failed_browser_open_leaves_booking_ready(tmp_path: Path) -> None:
     runtime, bookings, booking, _output, engine = make_runtime(
