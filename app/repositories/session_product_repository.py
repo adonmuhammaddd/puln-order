@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.database.tables import SessionProduct
@@ -12,6 +12,14 @@ from app.models.catalogue import CatalogueProduct
 def upsert_catalogue(
     session: Session, session_slug: str, products: Sequence[CatalogueProduct]
 ) -> None:
+    session.execute(
+        update(SessionProduct)
+        .where(
+            SessionProduct.session_slug == session_slug,
+            SessionProduct.is_active.is_(True),
+        )
+        .values(is_active=False)
+    )
     for item in products:
         record = session.scalars(
             select(SessionProduct).where(
@@ -46,6 +54,7 @@ def upsert_catalogue(
             record.price = str(item.price) if item.price is not None else None
             record.stock_remaining = item.stock_remaining
             record.max_quantity = item.max_quantity
+        record.is_active = True
     session.flush()
 
 
@@ -54,6 +63,7 @@ def get_by_id(session: Session, session_slug: str, product_id: int) -> SessionPr
         select(SessionProduct).where(
             SessionProduct.session_slug == session_slug,
             SessionProduct.puln_product_id == product_id,
+            SessionProduct.is_active.is_(True),
         )
     ).one_or_none()
 
