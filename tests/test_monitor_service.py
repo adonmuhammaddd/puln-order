@@ -77,6 +77,7 @@ def make_service(
     session_factory: sessionmaker[Session],
     clock: FakeClock | None = None,
     events: list[ChangeEvent] | None = None,
+    on_live: Callable | None = None,
 ) -> MonitorService:
     clock = clock or FakeClock()
     http = create_http_client(timeout=5, transport=httpx.MockTransport(script))
@@ -91,6 +92,7 @@ def make_service(
         clock=clock,
         rng=random.Random(0),
         on_event=sink.append,
+        on_live=on_live,
     )
 
 
@@ -272,3 +274,34 @@ def test_run_monitor_polls_until_policy_stops(session_factory: sessionmaker[Sess
     assert sum(sleeps) == pytest.approx(20)
     assert max(sleeps) <= 1
     assert len(updates) > 3
+
+
+def test_live_callback_receives_only_validated_snapshots(
+    session_factory: sessionmaker[Session],
+) -> None:
+    received = []
+    service = make_service(
+        Script(ok(body(2)), httpx.Response(503)),
+        session_factory,
+        on_live=received.append,
+    )
+
+    service.poll_once()
+    service.poll_once()
+
+    assert len(received) == 1
+    assert received[0].status.product(100).stock_remaining == 2
+
+
+def test_live_callback_failure_does_not_break_monitoring(
+    session_factory: sessionmaker[Session],
+) -> None:
+    def fail(_result: object) -> None:
+        raise RuntimeError("callback failed")
+
+    service = make_service(Script(ok(body())), session_factory, on_live=fail)
+
+    decision = service.poll_once()
+
+    assert decision.stop is False
+    assert service.state.last_valid is not None
