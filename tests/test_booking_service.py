@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -7,13 +8,14 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.database.engine import create_session_factory, init_db
 from app.models.booking import BookingStatus
+from app.models.catalogue import CatalogueProduct
 from app.models.customer import CustomerInput
 from app.models.puln import parse_live_status
 from app.parsers.reservation_response_parser import (
     ReservationReview,
     parse_reservation_response,
 )
-from app.repositories import product_repository, snapshot_repository
+from app.repositories import product_repository, session_product_repository, snapshot_repository
 from app.services.booking_service import (
     AVAILABILITY_WARNING,
     BookingNotFoundError,
@@ -413,3 +415,34 @@ def test_ambiguous_review_changes_nothing(
         service.record_page_review(booking_id, review_of(page))
 
     assert service.get(booking_id).status is S.SUBMITTED_BY_USER
+
+
+
+def test_synced_session_catalogue_overrides_legacy_product_ids(
+    service: BookingService,
+    customer_id: int,
+    session_factory: sessionmaker[Session],
+) -> None:
+    with session_factory() as db:
+        session_product_repository.upsert_catalogue(
+            db,
+            SLUG,
+            [
+                CatalogueProduct(
+                    105,
+                    "kataifi-rolls",
+                    "Kataifi Crunch (Personal)",
+                    Decimal("70000.00"),
+                    10,
+                    None,
+                )
+            ],
+        )
+        db.commit()
+
+    check = service.check(request(customer_id, product_id=105, quantity=2))
+    assert check.product_name == "Kataifi Crunch (Personal)"
+    assert check.max_quantity is None
+
+    with pytest.raises(BookingValidationError, match="products sync"):
+        service.check(request(customer_id, product_id=100))
