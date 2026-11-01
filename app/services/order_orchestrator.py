@@ -87,9 +87,7 @@ class OrderOrchestrator:
         if not isinstance(inspection.live, LiveOk):
             outcome = ExecutionOutcome.LIVE_DATA_UNAVAILABLE
             detail = f"live status is not trustworthy ({type(inspection.live).__name__})"
-            return tuple(
-                ExecutionResult(booking_id, outcome, detail) for booking_id in booking_ids
-            )
+            return tuple(ExecutionResult(booking_id, outcome, detail) for booking_id in booking_ids)
 
         live = inspection.live.status
         results: list[ExecutionResult] = []
