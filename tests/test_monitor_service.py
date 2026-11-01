@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.clients.puln_client import PulnClient, create_http_client
+from app.clients.puln_client import LiveOk, PulnClient, create_http_client
 from app.database.engine import create_session_factory, init_db
 from app.database.tables import MonitorCheck, StockSnapshot
 from app.repositories import snapshot_repository
@@ -77,7 +77,7 @@ def make_service(
     session_factory: sessionmaker[Session],
     clock: FakeClock | None = None,
     events: list[ChangeEvent] | None = None,
-    on_live: Callable | None = None,
+    on_live: Callable[[LiveOk], None] | None = None,
 ) -> MonitorService:
     clock = clock or FakeClock()
     http = create_http_client(timeout=5, transport=httpx.MockTransport(script))
@@ -279,7 +279,7 @@ def test_run_monitor_polls_until_policy_stops(session_factory: sessionmaker[Sess
 def test_live_callback_receives_only_validated_snapshots(
     session_factory: sessionmaker[Session],
 ) -> None:
-    received = []
+    received: list[LiveOk] = []
     service = make_service(
         Script(ok(body(2)), httpx.Response(503)),
         session_factory,
