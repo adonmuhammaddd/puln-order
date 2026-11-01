@@ -324,10 +324,14 @@ def run_products_sync(runtime: Runtime) -> int:
     for column in ("ID", "VARIANT", "NAME", "PRICE", "STOCK", "MAX QTY"):
         table.add_column(column)
     for product in products:
-        table.add_row(str(product.puln_product_id), product.variant_key, product.name,
+        table.add_row(
+            str(product.puln_product_id),
+            product.variant_key,
+            product.name,
             "-" if product.price is None else f"Rp {product.price:,.0f}",
             "-" if product.stock_remaining is None else str(product.stock_remaining),
-            "unknown" if product.max_quantity is None else str(product.max_quantity))
+            "unknown" if product.max_quantity is None else str(product.max_quantity),
+        )
     runtime.console.print(table)
     target = next((p for p in products if p.variant_key == "kataifi-rolls"), None)
     if target is None:
@@ -336,8 +340,10 @@ def run_products_sync(runtime: Runtime) -> int:
         )
         return 1
     runtime.console.print(
-        f"Target resolved: Kataifi Rolls -> {target.name} (Product ID {target.puln_product_id})",
-        markup=False)
+        f"Target resolved: Kataifi Rolls -> {target.name} "
+        f"(Product ID {target.puln_product_id})",
+        markup=False,
+    )
     return 0
 
 
