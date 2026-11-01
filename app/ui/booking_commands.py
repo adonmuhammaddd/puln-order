@@ -78,7 +78,7 @@ def _guarded(runtime: Runtime, action: Callable[[BookingService], int]) -> int:
 
 
 def _print_choices(runtime: Runtime, slug: str) -> None:
-    console, targets = runtime.console, runtime.settings.target_product_ids
+    console = runtime.console
     with runtime.session_factory() as db:
         product_repository.seed_known_products(db)
         db.commit()
@@ -101,8 +101,7 @@ def _print_choices(runtime: Runtime, slug: str) -> None:
     console.print("Legacy products:", style="bold")
     for product in products:
         limit = "no local limit" if product.max_quantity is None else f"max {product.max_quantity}"
-        marker = " (target)" if product.puln_product_id in targets else ""
-        console.print(f"  {product.puln_product_id}  {product.name}, {limit}{marker}", markup=False)
+        console.print(f"  {product.puln_product_id}  {product.name}, {limit}", markup=False)
     if cached is None:
         console.print("Pickup slots: no live data yet (run status)", style="yellow")
         return
