@@ -1,12 +1,15 @@
-import json
+from collections.abc import Callable
 from io import StringIO
+import json
 from pathlib import Path
 
 import httpx
 from rich.console import Console
+from sqlalchemy import Engine
 
 from app.config import Settings
 from app.database.engine import create_session_factory, init_db
+from app.database.tables import Booking
 from app.models.booking import BookingStatus
 from app.models.customer import CustomerInput
 from app.repositories import product_repository
@@ -18,7 +21,9 @@ from app.ui.order_commands import run_evaluate
 SLUG = "online-order-20261031"
 
 
-def make_runtime(tmp_path: Path, *, open_url=lambda _url: True):
+def make_runtime(
+    tmp_path: Path, *, open_url: Callable[[str], bool] = lambda _url: True
+) -> tuple[Runtime, BookingService, Booking, StringIO, Engine]:
     engine = init_db(f"sqlite:///{tmp_path / 'orders.db'}")
     factory = create_session_factory(engine)
     with factory() as db:
