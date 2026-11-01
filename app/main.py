@@ -83,6 +83,8 @@ def _dispatch_products(args: argparse.Namespace, runtime: commands.Runtime) -> i
     match args.action:
         case "list":
             return commands.run_products_list(runtime)
+        case "sync":
+            return commands.run_products_sync(runtime)
         case "name":
             return commands.run_products_name(runtime, args.product_id, args.name)
         case "limit":
