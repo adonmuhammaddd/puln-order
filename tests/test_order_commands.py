@@ -82,8 +82,12 @@ def make_runtime(
 
 def test_evaluate_opens_only_first_eligible_booking(tmp_path: Path) -> None:
     opened: list[str] = []
+    def open_url(url: str) -> bool:
+        opened.append(url)
+        return True
+
     runtime, bookings, booking, output, engine = make_runtime(
-        tmp_path, open_url=lambda url: opened.append(url) or True
+        tmp_path, open_url=open_url
     )
     try:
         assert run_evaluate(runtime, open_next=True) == 0
