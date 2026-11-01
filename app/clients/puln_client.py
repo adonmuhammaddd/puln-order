@@ -16,8 +16,8 @@ import httpx
 
 from app.clock import utc_now
 from app.constants import USER_AGENT
-from app.models.puln import LivePayloadError, LiveStatus, parse_live_status, unknown_fields
 from app.models.catalogue import CatalogueProduct, parse_catalogue
+from app.models.puln import LivePayloadError, LiveStatus, parse_live_status, unknown_fields
 
 logger = logging.getLogger(__name__)
 
