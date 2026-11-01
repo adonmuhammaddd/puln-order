@@ -21,6 +21,7 @@ from app.repositories import (
     booking_repository,
     customer_repository,
     product_repository,
+    session_product_repository,
     snapshot_repository,
 )
 
@@ -98,8 +99,7 @@ class BookingService:
 
     # Preparation
 
-    @staticmethod
-    def _validate(db: Session, request: PreparationRequest) -> Product:
+    def _validate(self, db: Session, request: PreparationRequest) -> Product | SessionProduct:
         customer = customer_repository.get(db, request.customer_id)
         if customer is None:
             raise BookingValidationError(f"customer {request.customer_id} does not exist")
