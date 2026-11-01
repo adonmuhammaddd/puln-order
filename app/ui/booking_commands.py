@@ -166,6 +166,56 @@ def run_list(runtime: Runtime, *, all_sessions: bool) -> int:
     return _guarded(runtime, action)
 
 
+
+WORKFLOW_NEXT: dict[BookingStatus, str] = {
+    BookingStatus.DRAFT: "Review details; mark ready when prepared",
+    BookingStatus.READY: "Run orders evaluate, then open the official page",
+    BookingStatus.OFFICIAL_FLOW_OPENED: "Complete the official form yourself; then mark submitted",
+    BookingStatus.SUBMITTED_BY_USER: "Review the saved result page, or mark awaiting-email",
+    BookingStatus.SUCCESS_PAGE_REVIEWED: "Mark awaiting-email and wait for the email",
+    BookingStatus.AWAITING_EMAIL: "Verify the official confirmation email, then run bookings confirm",
+    BookingStatus.CONFIRMED: "Complete",
+    BookingStatus.FAILED: "Terminal — investigate before preparing a new booking",
+    BookingStatus.CANCELLED: "Terminal — no further action",
+}
+
+
+def run_workflow(runtime: Runtime, *, all_sessions: bool) -> int:
+    def action(service: BookingService) -> int:
+        bookings = service.list_bookings(all_sessions=all_sessions)
+        table = Table(
+            title=f"BOOKING WORKFLOW ({'all sessions' if all_sessions else service.session_slug})",
+            title_justify="left",
+        )
+        for column in ("ID", "SESSION", "CUSTOMER", "PRODUCT", "STATUS", "NEXT ACTION"):
+            table.add_column(column, no_wrap=column in {"ID", "STATUS"})
+        with runtime.session_factory() as db:
+            names = product_repository.product_names(db)
+            customers = {c.id: c.display_name for c in customer_repository.list_customers(db)}
+        for booking in bookings:
+            table.add_row(
+                str(booking.id),
+                booking.session_slug,
+                customers.get(booking.customer_id, f"#{booking.customer_id}"),
+                names.get(booking.puln_product_id, f"Product #{booking.puln_product_id}"),
+                booking.status.value,
+                WORKFLOW_NEXT[booking.status],
+            )
+        if not bookings:
+            runtime.console.print("No bookings found for this session.")
+            return 0
+        runtime.console.print(table)
+        runtime.console.print(
+            "FIFO order is by booking ID (oldest first). Status comes from the local booking "
+            "database; this view does not infer that PULN accepted an order.",
+            style="dim",
+            markup=False,
+            soft_wrap=True,
+        )
+        return 0
+
+    return _guarded(runtime, action)
+
 def _describe(runtime: Runtime, booking: Booking) -> list[tuple[str, str]]:
     with runtime.session_factory() as db:
         customer = customer_repository.get(db, booking.customer_id)
